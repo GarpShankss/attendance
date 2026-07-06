@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Payslip - {{ emp.name }} - {{ month }}</title>
+
+  <style>
+    @page { size: A4; margin: 10mm; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      color: #000;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      border: 2px solid #000;
+      padding: 15px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* ---------- HEADER ---------- */
+    .header-section {
+      border: 1px solid #000;
+      padding: 10px;
+      margin-bottom: 2px;
+      text-align: center;
+    }
+
+    .logo {
+      height: 60px;
+      margin-bottom: 5px;
+    }
+
+    .header-top {
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .header-top div {
+      margin: 2px 0;
+    }
+
+    .company-name {
+      font-size: 22px;
+      font-weight: bold;
+      margin: 8px 0;
+      letter-spacing: 1px;
+    }
+
+    .company-address {
+      font-size: 11px;
+      margin: 3px 0;
+    }
+
+    .month-title {
+      text-align: center;
+      font-size: 13px;
+      font-weight: bold;
+      margin: 8px 0;
+      text-decoration: underline;
+      border: 1px solid #000;
+      padding: 5px;
+      margin-bottom: 2px;
+    }
+
+    /* ---------- TABLES ---------- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .info-table {
+      border: 1px solid #000;
+      margin-bottom: 2px;
+    }
+
+    .info-table td {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      font-size: 10px;
+    }
+
+    .info-table td.label {
+      font-weight: bold;
+      background: #f0f0f0;
+      width: 18%;
+    }
+
+    .info-table td.value {
+      width: 32%;
+    }
+
+    .salary-table {
+      border: 1px solid #000;
+      margin-bottom: 2px;
+    }
+
+    .salary-table th,
+    .salary-table td {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      font-size: 10px;
+    }
+
+    .salary-table th {
+      background: #e0e0e0;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .salary-table td.desc {
+      text-align: left;
+    }
+
+    .salary-table td.amount {
+      text-align: center;
+    }
+
+    .salary-table tr.total-row {
+      font-weight: bold;
+      background: #f5f5f5;
+    }
+
+    .ot-section {
+      border: 1px solid #000;
+      margin-bottom: 2px;
+    }
+
+    .ot-section td {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      font-size: 10px;
+    }
+
+    .net-pay-section {
+      border: 1px solid #000;
+      padding: 8px;
+      margin-bottom: 2px;
+    }
+
+    .net-pay-row {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .net-words {
+      font-style: italic;
+      font-size: 10px;
+      font-weight: normal;
+    }
+
+    .footer {
+      border: 1px solid #000;
+      padding: 8px;
+      font-size: 9px;
+      text-align: center;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header-section">
+    {% if logo_base64 %}
+    <img src="data:image/png;base64,{{ logo_base64 }}" class="logo" alt="Company Logo">
+    {% endif %}
+    
+    <div class="company-name">{{ company.name }}</div>
+    <div class="company-address">{{ company.address }}</div>
+    <div class="company-address">Electronic City, Bangalore - 560100</div>
+    
+    <div class="header-top" style="margin-top: 10px;">
+      <div><strong>Contract Labour (Regulation & Abolition)</strong></div>
+      <div>FORM XIX (See Rules 78(1)(b) Wage Slip)</div>
+    </div>
+  </div>
+
+  <div class="month-title">Salary Slip for the Month of {{ month }}</div>
+
+  <!-- EMPLOYEE INFO -->
+  <table class="info-table">
+    <tr>
+      <td class="label">EMP Code:</td>
+      <td class="value">{{ emp.emp_id }}</td>
+      <td class="label">Designation:</td>
+      <td class="value">{{ emp.designation }}</td>
+    </tr>
+    <tr>
+      <td class="label">EMP Name:</td>
+      <td class="value">{{ emp.name }}</td>
+      <td class="label">Unit Name:</td>
+      <td class="value">{{ emp.unit_name }}</td>
+    </tr>
+    <tr>
+      <td class="label">UAN No:</td>
+      <td class="value">{{ emp.uan }}</td>
+      <td class="label">Bank A/c No:</td>
+      <td class="value">{{ emp.bank_ac }}</td>
+    </tr>
+    <tr>
+      <td class="label">ESI No:</td>
+      <td class="value">{{ emp.esi }}</td>
+      <td class="label">DOJ:</td>
+      <td class="value">{{ emp.doj }}</td>
+    </tr>
+    <tr>
+      <td class="label">No of working days:</td>
+      <td class="value">{{ emp.basic_days }}</td>
+      <td class="label">No of days worked:</td>
+      <td class="value">{{ emp.actual_days }}</td>
+    </tr>
+  </table>
+
+  <!-- SALARY TABLE -->
+  <table class="salary-table">
+    <thead>
+      <tr>
+        <th rowspan="2" style="width: 28%;">Earnings</th>
+        <th colspan="2" style="width: 30%;">Amount</th>
+        <th rowspan="2" style="width: 28%;">Deductions</th>
+        <th rowspan="2" style="width: 14%;">Amount</th>
+      </tr>
+      <tr>
+        <th style="width: 15%;">Fixed</th>
+        <th style="width: 15%;">Earned</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="desc">Basic</td>
+        <td class="amount">{{ "%.0f"|format(salary_fixed.basic) }}</td>
+        <td class="amount">{{ "%.0f"|format(salary_earned.basic) }}</td>
+        <td class="desc">Provident Fund</td>
+        <td class="amount">{{ "%.0f"|format(deduction.pf) }}</td>
+      </tr>
+
+      <tr>
+        <td class="desc">DA</td>
+        <td class="amount">{{ "%.0f"|format(salary_fixed.da) }}</td>
+        <td class="amount">{{ "%.0f"|format(salary_earned.da) }}</td>
+        <td class="desc">ESI</td>
+        <td class="amount">{{ "%.0f"|format(deduction.esi) }}</td>
+      </tr>
+
+      <tr>
+        <td class="desc">HRA</td>
+        <td class="amount">{{ "%.0f"|format(salary_fixed.hra) }}</td>
+        <td class="amount">{{ "%.0f"|format(salary_earned.hra) }}</td>
+        <td class="desc">Professional Tax</td>
+        <td class="amount">{{ "%.0f"|format(deduction.pt) }}</td>
+      </tr>
+
+      <tr>
+        <td class="desc">Leave with wages</td>
+        <td class="amount">{{ "%.0f"|format(salary_fixed.leave_wages) }}</td>
+        <td class="amount">{{ "%.0f"|format(salary_earned.leave_wages) }}</td>
+        <td class="desc">ADV</td>
+        <td class="amount">{{ "%.0f"|format(deduction.adv) }}</td>
+      </tr>
+
+      <tr>
+        <td class="desc">Others</td>
+        <td class="amount">{{ "%.0f"|format(salary_fixed.others) }}</td>
+        <td class="amount">{{ "%.0f"|format(salary_earned.others) }}</td>
+        <td></td>
+        <td></td>
+      </tr>
+
+      <tr>
+        <td class="desc">Bonus</td>
+        <td class="amount">{{ "%.0f"|format(salary_fixed.bonus) }}</td>
+        <td class="amount">{{ "%.0f"|format(salary_earned.bonus) }}</td>
+        <td></td>
+        <td></td>
+      </tr>
+
+      <tr class="total-row">
+        <td class="desc"><strong>Gross Earning</strong></td>
+        <td class="amount"><strong>{{ "%.0f"|format(salary_fixed.total) }}</strong></td>
+        <td class="amount"><strong>{{ "%.0f"|format(salary_earned.total) }}</strong></td>
+        <td class="desc"><strong>Gross Deductions</strong></td>
+        <td class="amount"><strong>{{ "%.0f"|format(deduction.total) }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- OT HRS and OT COST -->
+  <table class="ot-section">
+    <tr>
+      <td style="width: 28%; font-weight: bold;">OT Hrs</td>
+      <td style="width: 30%; text-align: center;"></td>
+      <td style="width: 28%; font-weight: bold;">OT Cost</td>
+      <td style="width: 14%; text-align: center;"></td>
+    </tr>
+  </table>
+
+  <!-- NET PAY -->
+  <div class="net-pay-section">
+    <div class="net-pay-row">
+      <span>Net Pay (INR):</span>
+      <span>{{ "%.0f"|format(net_pay) }}</span>
+    </div>
+    <div class="net-words">In Words: {{ net_pay_words }}</div>
+  </div>
+
+  <div class="footer">
+    **This is a system generated salary slip; hence signature not required.
+  </div>
+
+</div>
+</body>
+</html>

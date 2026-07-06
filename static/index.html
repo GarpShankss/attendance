@@ -1,69 +1,52 @@
 <!doctype html>
 <html>
 <head>
+<script>
+  if (localStorage.getItem('rs_auth') !== 'authenticated') {
+    window.location.href = '/login.html';
+  }
+</script>
 <meta charset="utf-8">
 <title>Payroll Data Editor</title>
 <style>
   * { box-sizing: border-box; transition: all 0.2s ease; }
   body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
-    color: #f3f4f6;
+    font-family: sans-serif;
+    background: #f9f9f9;
+    color: #000;
     margin: 0;
-    padding: 24px;
-    min-height: 100vh;
-  }
-  h2 {
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 700;
-    margin-top: 0;
-    margin-bottom: 4px;
-  }
+    padding: 20px;
+}
+  h2 { margin-top: 0; }
   nav {
-    background: rgba(31, 41, 55, 0.6);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 12px 20px;
-    margin-bottom: 24px;
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 20px;
     display: flex;
     gap: 20px;
-  }
-  nav a {
-    color: #9ca3af;
-    text-decoration: none;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  nav a:hover {
-    color: #60a5fa;
-    text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
-  }
+}
+  nav a { color: #000; text-decoration: none; font-weight: bold; }
+  nav a:hover { text-decoration: underline; }
 
   section {
-    background: rgba(17, 24, 39, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    padding: 24px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 16px;
     margin-bottom: 24px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  }
+}
   section h3 { margin-top: 0; color: #9ca3af; font-size: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
 
   /* Tables */
-  table { border-collapse: collapse; margin-top: 10px; font-size: 12px; width: 100%; background: rgba(31, 41, 55, 0.3); border-radius: 12px; overflow: hidden; }
-  th, td { border: 1px solid rgba(255,255,255,0.05); padding: 8px 12px; white-space: nowrap; text-align: left; }
-  th { background: #0f172a; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; position: sticky; top: 0; z-index: 1; }
-  td.meta { background: rgba(17, 24, 39, 0.5); color: #9ca3af; font-style: italic; }
-  .table-wrap { max-height: 65vh; overflow: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; margin-top: 10px; background: #0f172a; }
+  table { border-collapse: collapse; margin-top: 10px; font-size: 12px; width: 100%; background: #fff; overflow: hidden; border: 1px solid #ddd; }
+  th, td { border: 1px solid #ddd; padding: 6px 10px; white-space: nowrap; text-align: left; }
+  th { background: #fde047; color: #000; font-weight: bold; position: sticky; top: 0; z-index: 1; }
+  td.meta { background: #f9f9f9; color: #666; font-style: italic; }
+  .table-wrap { max-height: 65vh; overflow: auto; margin-top: 10px; background: #fff; }
 
   /* Inline edit inputs */
-  td input.cell-input { width: 100%; border: 1px solid #3b82f6; border-radius: 4px;
+  td input.cell-input { width: 100%; min-width: 80px; border: 1px solid #3b82f6; border-radius: 4px;
     padding: 4px 8px; font-size: 12px; background: rgba(15, 23, 42, 0.9); color: #f8fafc; }
 
   /* Buttons */
@@ -106,7 +89,7 @@
   .btn-save { background: linear-gradient(135deg, #059669, #047857); color: #fff; }
   .btn-cancel { background: #374151; color: #d1d5db; border: 1px solid rgba(255,255,255,0.05); }
   
-  .status { margin-left: 10px; color: #34d399; font-size: 13px; font-weight: 500; }
+  .status { margin-left: 10px; font-weight: bold; color: #000; }
 
   /* Modal */
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
@@ -200,6 +183,10 @@
     <button id="showDataBtn">Show Data</button>
     <button id="generatePayrollBtn" class="btn-primary" style="margin-left:8px;">Generate Payroll</button>
     <button id="downloadPayrollBtn" style="margin-left:8px; background:#2e7d32; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Download Payroll</button>
+    <button id="btnGenerateAll" style="margin-left:8px; background:#1976d2; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Generate All Payslips</button>
+    <button id="btnDownloadAll" style="margin-left:8px; background:#f57c00; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Download All Payslips</button>
+    <button id="btnWaAll" style="margin-left:8px; background:#388e3c; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Send All WhatsApp</button>
+
     <span class="status" id="generatePayrollStatus"></span>
     <span class="status" id="dataStatus"></span>
   </div>
@@ -456,8 +443,12 @@ document.getElementById('downloadPayrollBtn').addEventListener('click', () => {
 
 
 const NON_EDITABLE_COLUMNS = new Set([
-  'ATTENDANCE - Present Days',
-  'ATTENDANCE - Pay Days',
+  'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
+  'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 'EARNING - Bonus @8.33%', 'EARNING - OT Amount', 'EARNING - Total',
+  'Deductions - PF 12%', 'Deductions - ESIC 0.75%', 'Deductions - PT', 'Deductions - Total Deduction',
+  'CONTRIBUTION - EPF @ 13%', 'CONTRIBUTION - ESIC @ 3.25%', 'CONTRIBUTION - Total Employer Contribution',
+  'CONTRIBUTION - CTC', 'CONTRIBUTION - Total CTC',
+  'Net Pay'
 ]);
 
 async function loadData() {
@@ -525,31 +516,122 @@ async function generatePayroll() {
 // ---- Render table ----
 function renderDataTable(columns, rows) {
   editingRows = {};
-  const metaCols = ['_sheet', '_warehouse'];
   const monthYearSelected = Boolean(els.filterMonth.value && els.filterYear.value);
-  const head = '<thead><tr><th>Actions</th>' +
-    metaCols.map(c => `<th>${c.slice(1)}</th>`).join('') +
-    columns.map(c => `<th>${escapeHtml(c)}</th>`).join('') +
-    '</tr></thead>';
+  
+  const COLUMN_GROUPS = [
+    { name: "Employee Details", cols: ["emp_id", "Employee Name", "location", "warehouse", "Designation", "Department", "Active Status", "DOJ", "ACCOUNT", "Bank Name", "IFSC", "UAN", "ESIC", "PAN", "Email", "Mobile Number"] },
+    { name: "Fixed", cols: ["FIXED - Working Days", "FIXED - Basic", "FIXED - DA", "FIXED - Other Allows", "FIXED - Leave With wages", "FIXED - Bonus @8.33%", "FIXED - Total"] },
+    { name: "Attendance", cols: ["ATTENDANCE - Present Days", "ATTENDANCE - Holi day", "ATTENDANCE - Pay Days", "ATTENDANCE - OT Hours"] },
+    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - Other Allows", "EARNING - Leave With wages", "EARNING - Bonus @8.33%", "EARNING - OT Amount", "EARNING - Total"] },
+    { name: "Deductions", cols: ["Deductions - PF 12%", "Deductions - ESIC 0.75%", "Deductions - PT", "Deductions - Adv", "Deductions - Total Deduction"] },
+    { name: "Employer Contribution", cols: ["CONTRIBUTION - EPF @ 13%", "CONTRIBUTION - ESIC @ 3.25%", "CONTRIBUTION - Total Employer Contribution"] },
+    { name: "CTC", cols: ["CONTRIBUTION - CTC", "CONTRIBUTION - Service Charge", "CONTRIBUTION - Uniform Charges", "CONTRIBUTION - T Shirt", "CONTRIBUTION - Shoes", "CONTRIBUTION - Total CTC"] },
+    { name: "Net Pay", cols: ["Net Pay"] }
+  ];
+
+  let head1 = '<tr><th rowspan="2" class="sticky-col actions-col" style="z-index: 4; background: #fde047; color: #000; border: 1px solid #ddd; padding: 8px;">Actions</th>';
+  let head2 = '<tr>';
+
+  const allColumns = [];
+  COLUMN_GROUPS.forEach(g => {
+    const validCols = g.cols.filter(c => columns.includes(c) || c === "Employee Name" || c === "Mobile Number" || c === "emp_id");
+    if (validCols.length === 0) return;
+    
+    head1 += `<th colspan="${validCols.length}" style="background: #fde047; color: #000; border: 1px solid #ddd; padding: 8px; text-align:center;">${g.name}</th>`;
+    
+    validCols.forEach(c => {
+      allColumns.push(c);
+      let shortName = c.replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", "");
+      
+      let extraClass = '';
+      if(g.name === 'Employee Details') {
+          if (c === 'emp_id') extraClass = 'sticky-col emp-id-col';
+          if (c === 'Employee Name') extraClass = 'sticky-col emp-name-col';
+      }
+      head2 += `<th class="${extraClass}" style="background: #fde047; color: #000; border: 1px solid #ddd; padding: 8px;">${escapeHtml(shortName)}</th>`;
+    });
+  });
+  head1 += '</tr>';
+  head2 += '</tr>';
+
+  let totals = {};
+  allColumns.forEach(c => totals[c] = 0);
 
   const body = '<tbody>' + rows.map(r => {
     const rowKey = `${r._collection}__${r._row_id}`;
-    const editButton = monthYearSelected ?
-      `<button class="btn-edit" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>` :
-      `<button class="btn-edit" disabled title="Select Month and Year to edit salary records">Edit</button>`;
-    return `<tr data-collection="${escapeAttr(r._collection)}"
-               data-row-id="${r._row_id}" data-row-key="${escapeAttr(rowKey)}">
-      <td style="white-space:nowrap;">
-        ${editButton}
-      </td>` +
-      metaCols.map(c => `<td class="meta">${escapeHtml(r[c] ?? '')}</td>`).join('') +
-      columns.map(c =>
-        `<td data-col="${escapeAttr(c)}">${escapeHtml(r[c] ?? '')}</td>`
-      ).join('') +
-    '</tr>';
+    
+    let actionButtons = '';
+    if (editingRows[rowKey]) {
+        actionButtons += `<button class="btn-save" style="margin-right:2px;" onclick="saveRow('${escapeAttr(rowKey)}')">Save</button>`;
+        actionButtons += `<button class="btn-cancel" onclick="cancelEdit('${escapeAttr(rowKey)}')">Cancel</button>`;
+    } else {
+        const editButton = monthYearSelected ?
+          `<button class="btn-edit" style="margin-right:2px;" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>` :
+          `<button class="btn-edit" disabled title="Select Month and Year to edit salary records" style="margin-right:2px;">Edit</button>`;
+        
+        const deleteButton = `<button class="btn-cancel" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2);" onclick="deleteEmployeeRow('${escapeAttr(rowKey)}')">Delete</button>`;
+        
+        actionButtons += editButton + deleteButton;
+        
+        if (r._collection === 'payroll_records' && r._id) {
+            actionButtons += `<br><button class="btn-pdf" style="margin-top:2px; margin-right:2px;" onclick="generatePayslip('${r._id}')">Generate</button>`;
+            actionButtons += `<button class="btn-pdf" style="margin-top:2px; margin-right:2px;" onclick="downloadPayslip('${r._id}')">Download</button>`;
+            actionButtons += `<button class="btn-pdf" style="margin-top:2px;" onclick="sendWhatsApp('${r._id}')">WA</button>`;
+        }
+    }
+
+    let tr = `<tr data-collection="${escapeAttr(r._collection)}" data-row-id="${r._row_id}" data-obj-id="${r._id || ''}" data-row-key="${escapeAttr(rowKey)}">
+      <td class="sticky-col actions-col" style="background: #fff; color: #000; z-index: 3;">${actionButtons}</td>`;
+
+    allColumns.forEach(c => {
+      let val = r[c] ?? '';
+      if (c === 'Employee Name' && !val) val = r['emp_name'] || '';
+      
+      let isNumeric = !isNaN(parseFloat(val)) && isFinite(val) && val !== '';
+      if (isNumeric) totals[c] += parseFloat(val);
+      
+      let extraClass = isNumeric ? 'numeric' : '';
+      let inlineStyle = '';
+      if (c === 'emp_id') {
+          extraClass += ' sticky-col emp-id-col';
+          inlineStyle = 'background: #fff; color: #000; z-index: 2;';
+      }
+      if (c === 'Employee Name') {
+          extraClass += ' sticky-col emp-name-col';
+          inlineStyle = 'background: #fff; color: #000; z-index: 2;';
+      }
+      
+      if (editingRows[rowKey] && !NON_EDITABLE_COLUMNS.has(c) && c !== 'emp_id' && c !== 'Employee Name') {
+          tr += `<td class="${extraClass.trim()}" style="${inlineStyle}">
+                   <input type="text" class="cell-input" data-col="${escapeAttr(c)}" value="${escapeHtml(val)}" />
+                 </td>`;
+      } else {
+          tr += `<td data-col="${escapeAttr(c)}" class="${extraClass.trim()}" style="${inlineStyle}">${escapeHtml(val)}</td>`;
+      }
+    });
+    tr += '</tr>';
+    return tr;
   }).join('') + '</tbody>';
 
-  els.dataTable.innerHTML = head + body;
+  let foot = '<tfoot><tr><th class="sticky-col actions-col" style="z-index: 4; background: #fde047; color: #000; padding: 8px;">GRAND TOTAL</th>';
+  allColumns.forEach(c => {
+    let extraClass = '';
+    let inlineStyle = 'background: #fde047; color: #000; padding: 8px;';
+    if (c === 'emp_id') {
+        extraClass = 'sticky-col emp-id-col';
+    }
+    if (c === 'Employee Name') {
+        extraClass = 'sticky-col emp-name-col';
+    }
+    
+    // Only show total for non-Employee Details columns
+    let isEmpDetail = COLUMN_GROUPS[0].cols.includes(c);
+    let val = isEmpDetail ? '' : (totals[c] ? totals[c].toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : '0');
+    foot += `<th class="${extraClass}" style="${inlineStyle} ${!isEmpDetail ? 'text-align:right;' : ''}">${val}</th>`;
+  });
+  foot += '</tr></tfoot>';
+
+  els.dataTable.innerHTML = '<thead>' + head1 + head2 + '</thead>' + body + foot;
 }
 
 // ---- Calculation Log Panel ----
@@ -618,8 +700,8 @@ function cancelEdit(rowKey) {
 async function saveRow(rowKey) {
   const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
   if (!tr) return;
-  const collection = tr.dataset.collection;
-  const rowId = tr.dataset.rowId;
+  const collection = tr.dataset.collection || "payroll_records";
+  const rowId = tr.dataset.objId || tr.dataset.rowId;
 
   const payload = {};
   tr.querySelectorAll('input.cell-input[data-col]').forEach(inp => {
@@ -641,20 +723,81 @@ async function saveRow(rowKey) {
       showLog(data.calc_log);
     }
 
-    // update cells with recalculated values from server
-    const updated = data.row;
-    tr.querySelector('td:first-child').innerHTML =
-      `<button class="btn-edit" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>`;
-    tr.querySelectorAll('td[data-col]').forEach(td => {
-      const col = td.dataset.col;
-      const newVal = updated[col] ?? '';
-      td.innerHTML = escapeHtml(newVal);
-    });
     delete editingRows[rowKey];
+    // update cells by reloading data to preserve all action buttons properly
+    const st = els.dataTable.parentElement.scrollTop;
+    await loadData();
+    els.dataTable.parentElement.scrollTop = st;
     els.dataStatus.textContent = 'Saved \u2713';
     setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
   } catch (err) {
     els.dataStatus.textContent = 'Save failed: ' + err.message;
+  }
+}
+
+async function downloadPayslip(id) {
+  window.open(`/payroll/${id}/download_payslip`, '_blank');
+}
+
+document.getElementById('btnGenerateAll')?.addEventListener('click', async () => {
+  els.dataStatus.textContent = 'Generating all payslips...';
+  try {
+    const res = await fetch('/payroll/generate_all', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    els.dataStatus.textContent = 'Generated All Payslips Successfully ?';
+    setTimeout(() => { els.dataStatus.textContent = ''; loadData(); }, 2000);
+  } catch(err) {
+    els.dataStatus.textContent = 'Error: ' + err.message;
+  }
+});
+
+document.getElementById('btnWaAll')?.addEventListener('click', async () => {
+  els.dataStatus.textContent = 'Sending all WhatsApp messages...';
+  try {
+    const res = await fetch('/payroll/send_whatsapp_all', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    els.dataStatus.textContent = 'Sent All WhatsApp Messages ?';
+    setTimeout(() => { els.dataStatus.textContent = ''; loadData(); }, 2000);
+  } catch(err) {
+    els.dataStatus.textContent = 'Error: ' + err.message;
+  }
+});
+
+document.getElementById('btnDownloadAll')?.addEventListener('click', () => {
+  const loc = els.filterLocation.value;
+  const wh = els.filterWarehouse.value;
+  const mo = els.filterMonth.value;
+  const yr = els.filterYear.value;
+  if(!mo || !yr) {
+    alert("Please select Month and Year");
+    return;
+  }
+  let url = `/payroll/download_all?month=${mo}&year=${yr}`;
+  if(loc) url += `&location=${loc}`;
+  if(wh) url += `&warehouse=${wh}`;
+  window.open(url, '_blank');
+});
+
+async function generatePayslip(payrollId) {
+  els.dataStatus.textContent = 'Generating PDF...';
+  try {
+    const res = await fetch(`/payroll/${payrollId}/generate_payslip`, { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    els.dataStatus.textContent = 'PDF Generated successfully: ' + data.payslip.file_name;
+  } catch (err) {
+    els.dataStatus.textContent = 'PDF Error: ' + err.message;
+  }
+}
+
+async function sendWhatsApp(payrollId) {
+  els.dataStatus.textContent = 'Sending WhatsApp...';
+  try {
+    const res = await fetch(`/payroll/${payrollId}/send_whatsapp`, { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    els.dataStatus.textContent = 'WhatsApp Sent successfully!';
+  } catch (err) {
+    els.dataStatus.textContent = 'WhatsApp Error: ' + err.message;
   }
 }
 
@@ -669,7 +812,7 @@ function getRowData(tr) {
 async function recalculateRow(rowKey) {
   const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
   if (!tr) return;
-  const collection = tr.dataset.collection;
+  const collection = tr.dataset.collection || "payroll_records";
   const rowId = tr.dataset.rowId;
   els.dataStatus.textContent = 'Recalculating...';
   try {

@@ -1,0 +1,19 @@
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Application specific
+uploads/
+*.pdf
+*.zip
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db

@@ -28,6 +28,7 @@ Schema:
 """
 from datetime import datetime
 from salary_calc import recalculate
+from attendance_engine import _calc_attendance
 
 PAYROLL_COLLECTION = "payroll_records"
 ATTENDANCE_COLLECTION = "_attendance"
@@ -65,15 +66,22 @@ def generate_monthly_payroll(month: int, year: int,
             continue
 
         attendance_doc = db[ATTENDANCE_COLLECTION].find_one({
-            "emp_id": emp["emp_id"], "location": emp["location"],
-            "warehouse": emp["warehouse"], "month": month, "year": year,
+            "emp_id": emp["emp_id"], "location": emp["location"], "warehouse": emp["warehouse"]
         })
-        present = attendance_doc.get("present_days", 0) if attendance_doc else 0
-        pay = attendance_doc.get("pay_days", present) if attendance_doc else 0
+        full_days = attendance_doc.get("days", {}) if attendance_doc else {}
+        
+        fixed_wd = emp.get("FIXED - Working Days")
+        try:
+            fixed_wd = float(fixed_wd)
+        except (ValueError, TypeError):
+            fixed_wd = None
+            
+        present, absent, pay, lop, wd = _calc_attendance(emp["emp_id"], emp["location"], emp["warehouse"], month, year, full_days, fixed_wd, db=db)
 
         attendance = {
             "ATTENDANCE - Present Days": present,
             "ATTENDANCE - Pay Days":     pay,
+            "ATTENDANCE - LOP":          lop,
         }
 
         # Try to find the previous month's payroll record to carry forward inputs
@@ -88,33 +96,40 @@ def generate_monthly_payroll(month: int, year: int,
         })
 
         salary_data = dict(emp.get("salary", {}))
+        identity_data = dict(emp.get("identity", {}))
+        mobile_number = emp.get("mobile_number", "")
+        deductions_data = {}
         
-        # If there's a previous record, carry forward its inputs
+        # If there's a previous record, carry forward its full Employee Info and Fixed Inputs
         if prev_record:
             if isinstance(prev_record.get("salary"), dict):
-                for k, v in prev_record["salary"].items():
-                    if k in ("CONTRIBUTION - Service Charge", "CONTRIBUTION - T Shirt", 
-                            "CONTRIBUTION - Shoes", "CONTRIBUTION - Uniform Charges"):
-                        salary_data[k] = v
+                salary_data = dict(prev_record["salary"])
+            if isinstance(prev_record.get("identity"), dict):
+                identity_data = dict(prev_record["identity"])
             if isinstance(prev_record.get("deductions"), dict):
-                salary_data["Deductions - Adv"] = prev_record["deductions"].get("Deductions - Adv", 0)
+                deductions_data["Deductions - Adv"] = prev_record["deductions"].get("Deductions - Adv", 0)
+            if "mobile_number" in prev_record:
+                mobile_number = prev_record["mobile_number"]
 
         salary_data.setdefault("CONTRIBUTION - T Shirt", 0)
         salary_data.setdefault("CONTRIBUTION - Shoes", 0)
         salary_data.setdefault("CONTRIBUTION - Service Charge", salary_data.get("CONTRIBUTION - Service Charge", 0))
-        salary_data.setdefault("Deductions - Adv", salary_data.get("Deductions - Adv", 0))
+        salary_data.setdefault("Deductions - Adv", deductions_data.get("Deductions - Adv", 0))
 
         doc = {
             **key,
             "emp_name":     emp.get("emp_name", ""),
+            "mobile_number": mobile_number,
             "status":       "draft",
             "salary":       salary_data,
-            "identity":     dict(emp.get("identity", {})),
+            "identity":     identity_data,
             "attendance":   dict(attendance),
+            "FIXED - Working Days":      wd,
             "ATTENDANCE - Present Days": present,
             "ATTENDANCE - Pay Days":     pay,
+            "ATTENDANCE - LOP":          lop,
             "earnings":      {},
-            "deductions":    {},
+            "deductions":    deductions_data,
             "contributions": {},
             "net_pay":       None,
             "created_at":    datetime.utcnow(),

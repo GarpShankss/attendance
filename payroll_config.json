@@ -6,5 +6,15 @@
   "pf_wage_ceiling": 15000,
   "esi_eligibility_ceiling": 21001,
   "professional_tax_amount": 200,
-  "professional_tax_threshold": 25000
+  "professional_tax_threshold": 25000,
+  "attendance_policy": {
+    "P":  { "name": "Present",         "present": 1,   "paid": true,  "lop": 0 },
+    "WO": { "name": "Week Off",        "present": 1,   "paid": true,  "lop": 0 },
+    "H":  { "name": "Holiday",         "present": 1,   "paid": true,  "lop": 0 },
+    "CL": { "name": "Casual Leave",    "present": 1,   "paid": true,  "lop": 0 },
+    "SL": { "name": "Sick Leave",      "present": 1,   "paid": true,  "lop": 0 },
+    "PL": { "name": "Paid Leave",      "present": 1,   "paid": true,  "lop": 0 },
+    "HL": { "name": "Half Leave",      "present": 0.5, "paid": true,  "lop": 0.5 },
+    "A":  { "name": "Absent",          "present": 0,   "paid": false, "lop": 1 }
+  }
 }

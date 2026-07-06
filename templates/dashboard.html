@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RS MAN-TECH · Payslip Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy:   #11224E;
+            --orange: #F87B1B;
+            --sage:   #CBD99B;
+            --light:  #EEEEEE;
+            --white:  #ffffff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--light);
+            min-height: 100vh;
+        }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            width: 240px;
+            background: var(--navy);
+            display: flex;
+            flex-direction: column;
+            padding: 32px 0;
+            z-index: 100;
+        }
+
+        .sidebar-brand {
+            padding: 0 24px 32px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .sidebar-brand .logo-mark {
+            width: 42px; height: 42px;
+            background: var(--orange);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+
+        .sidebar-brand h2 {
+            font-family: 'Playfair Display', serif;
+            color: var(--white);
+            font-size: 16px;
+            line-height: 1.2;
+        }
+
+        .sidebar-brand p {
+            color: rgba(255,255,255,0.35);
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        .sidebar-nav {
+            padding: 24px 16px;
+            flex: 1;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            color: rgba(255,255,255,0.45);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 4px;
+        }
+
+        .nav-item.active {
+            background: rgba(248,123,27,0.15);
+            color: var(--orange);
+        }
+
+        .nav-item:hover:not(.active) {
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.7);
+        }
+
+        .sidebar-footer {
+            padding: 20px 24px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255,255,255,0.35);
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .logout-btn:hover { color: var(--orange); }
+
+        /* ── MAIN ── */
+        .main {
+            margin-left: 240px;
+            min-height: 100vh;
+            padding: 36px 36px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .topbar h1 {
+            font-family: 'Playfair Display', serif;
+            color: var(--navy);
+            font-size: 26px;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--white);
+            border-radius: 30px;
+            padding: 6px 16px 6px 6px;
+            box-shadow: 0 2px 8px rgba(17,34,78,0.08);
+        }
+
+        .user-avatar {
+            width: 32px; height: 32px;
+            background: var(--navy);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--orange);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .user-chip span {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--navy);
+        }
+
+        /* ── UPLOAD CARD ── */
+        .card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 12px rgba(17,34,78,0.06);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .card-header-dot {
+            width: 8px; height: 8px;
+            background: var(--orange);
+            border-radius: 50%;
+        }
+
+        .card-header h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--navy);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .upload-row {
+            display: grid;
+            grid-template-columns: 1fr 180px 120px;
+            gap: 14px;
+            margin-bottom: 18px;
+        }
+
+        .file-drop {
+            border: 2px dashed rgba(17,34,78,0.15);
+            border-radius: 12px;
+            padding: 16px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(238,238,238,0.4);
+        }
+
+        .file-drop:hover {
+            border-color: var(--orange);
+            background: rgba(248,123,27,0.04);
+        }
+
+        .file-drop.has-file {
+            border-style: solid;
+            border-color: var(--sage);
+            background: rgba(203,217,155,0.15);
+        }
+
+        .file-icon {
+            width: 38px; height: 38px;
+            background: rgba(17,34,78,0.06);
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 17px;
+            flex-shrink: 0;
+        }
+
+        .file-drop input { display: none; }
+
+        .file-drop-text strong {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--navy);
+        }
+
+        .file-drop-text small {
+            font-size: 11px;
+            color: rgba(17,34,78,0.4);
+        }
+
+        select {
+            width: 100%;
+            height: 100%;
+            padding: 0 36px 0 14px;
+            border-radius: 12px;
+            border: 2px solid rgba(17,34,78,0.1);
+            background: rgba(238,238,238,0.4);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--navy);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 4.5L11 1' stroke='%2311224E' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-color: rgba(238,238,238,0.4);
+            min-height: 50px;
+        }
+
+        select:focus { outline: none; border-color: var(--orange); }
+
+        /* ── BUTTONS ── */
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 13px 8px;
+            border-radius: 12px;
+            border: none;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:hover:not(:disabled) { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
+
+        .btn-generate {
+            background: var(--navy);
+            color: var(--white);
+            box-shadow: 0 4px 14px rgba(17,34,78,0.25);
+        }
+        .btn-generate:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(17,34,78,0.35); }
+
+        .btn-email {
+            background: var(--orange);
+            color: var(--white);
+            box-shadow: 0 4px 14px rgba(248,123,27,0.3);
+        }
+        .btn-email:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(248,123,27,0.4); }
+
+        .btn-whatsapp {
+            background: #25D366;
+            color: white;
+            box-shadow: 0 4px 14px rgba(37,211,102,0.3);
+        }
+        .btn-whatsapp:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(37,211,102,0.4); }
+
+        .btn-download {
+            background: var(--sage);
+            color: var(--navy);
+        }
+        .btn-download:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(203,217,155,0.5); }
+
+        .btn-month {
+            background: var(--light);
+            color: var(--navy);
+            border: 2px solid rgba(17,34,78,0.1);
+        }
+        .btn-month:hover:not(:disabled) { border-color: var(--navy); }
+
+        /* ── STATUS ── */
+        #status {
+            display: none;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+
+        #status.success { display: block; background: rgba(203,217,155,0.3); color: #3a5a00; border: 1px solid rgba(203,217,155,0.8); }
+        #status.error   { display: block; background: rgba(248,123,27,0.08); color: #c05000; border: 1px solid rgba(248,123,27,0.3); }
+        #status.processing { display: block; background: rgba(17,34,78,0.06); color: var(--navy); border: 1px solid rgba(17,34,78,0.12); }
+
+        /* ── STATS ── */
+        .stats-row {
+            display: none;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--white);
+            border-radius: 14px;
+            padding: 20px 22px;
+            box-shadow: 0 2px 12px rgba(17,34,78,0.06);
+            border-left: 4px solid var(--navy);
+        }
+
+        .stat-card.orange { border-left-color: var(--orange); }
+        .stat-card.sage   { border-left-color: var(--sage); }
+        .stat-card.green  { border-left-color: #25D366; }
+
+        .stat-label {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(17,34,78,0.4);
+            margin-bottom: 6px;
+        }
+
+        .stat-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 30px;
+            color: var(--navy);
+            line-height: 1;
+        }
+
+        /* ── TABLE ── */
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead tr { background: var(--navy); }
+
+        th {
+            padding: 13px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.7);
+        }
+
+        tbody tr { border-bottom: 1px solid var(--light); transition: background 0.15s; }
+        tbody tr:hover { background: rgba(203,217,155,0.12); }
+        tbody tr:last-child { border-bottom: none; }
+
+        td { padding: 12px 16px; color: var(--navy); }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .pill-generated { background: rgba(203,217,155,0.3); color: #3a5a00; }
+        .pill-emailed   { background: rgba(248,123,27,0.12); color: #c05000; }
+        .pill-whatsapp  { background: rgba(37,211,102,0.12); color: #1a7a40; }
+        .pill-failed    { background: rgba(220,38,38,0.1); color: #dc2626; }
+
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+            .upload-row { grid-template-columns: 1fr; }
+            .button-grid { grid-template-columns: 1fr 1fr; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+    <div class="sidebar-brand">
+        <div class="logo-mark">💼</div>
+        <h2>RS MAN-TECH</h2>
+        <p>HR Portal</p>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="nav-item active">📄 Payslip Generator</div>
+        <div class="nav-item">📊 Reports</div>
+        <div class="nav-item">👥 Employees</div>
+        <div class="nav-item">⚙️ Settings</div>
+    </nav>
+    <div class="sidebar-footer">
+        <a href="/logout" class="logout-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Sign out
+        </a>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="topbar">
+        <div>
+            <h1>Payslip Generator</h1>
+            <p style="font-size:13px;color:rgba(17,34,78,0.45);margin-top:3px;">Generate, distribute and manage employee payslips</p>
+        </div>
+        <div class="topbar-right">
+            <div class="user-chip">
+                <div class="user-avatar">HR</div>
+                <span>Admin</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPLOAD CARD -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-header-dot"></div>
+            <h3>Upload & Generate</h3>
+        </div>
+
+        <div class="upload-row">
+            <label class="file-drop" id="fileDrop">
+                <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
+                <div class="file-icon">📁</div>
+                <div class="file-drop-text">
+                    <strong id="fileLabel">Choose CSV or Excel file</strong>
+                    <small>.csv, .xlsx, .xls supported</small>
+                </div>
+            </label>
+            <select id="month">
+                <option>January</option><option>February</option><option>March</option>
+                <option>April</option><option>May</option><option>June</option>
+                <option>July</option><option>August</option><option>September</option>
+                <option>October</option><option>November</option><option>December</option>
+            </select>
+            <select id="year">
+                <option>2024</option><option>2025</option>
+                <option selected>2026</option><option>2027</option>
+            </select>
+        </div>
+
+        <div class="button-grid">
+            <button class="btn btn-generate" onclick="uploadCSV()">🚀 Generate</button>
+            <button id="emailBtn" class="btn btn-email" disabled onclick="sendEmails()">📧 Send Emails</button>
+            <button id="whatsappBtn" class="btn btn-whatsapp" disabled onclick="sendWhatsApp()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                </svg>
+                WhatsApp
+            </button>
+            <button id="downloadCurrentBtn" class="btn btn-download" disabled onclick="downloadCurrent()">📥 Download</button>
+            <button class="btn btn-month" onclick="downloadByMonth()">📦 By Month</button>
+        </div>
+    </div>
+
+    <!-- STATUS -->
+    <div id="status"></div>
+
+    <!-- STATS -->
+    <div class="stats-row" id="statsSection">
+        <div class="stat-card">
+            <div class="stat-label">Total Employees</div>
+            <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat-card orange">
+            <div class="stat-label">PDFs Generated</div>
+            <div class="stat-value" id="statGenerated">0</div>
+        </div>
+        <div class="stat-card sage">
+            <div class="stat-label">Emails Sent</div>
+            <div class="stat-value" id="statEmails">—</div>
+        </div>
+        <div class="stat-card green">
+            <div class="stat-label">WhatsApp Sent</div>
+            <div class="stat-value" id="statWhatsapp">—</div>
+        </div>
+    </div>
+
+    <!-- TABLE CARD -->
+    <div class="card" id="tableCard" style="display:none; padding:0; overflow:hidden;">
+        <div class="table-wrap">
+            <table id="previewTable">
+                <thead>
+                    <tr>
+                        <th>EMP ID</th>
+                        <th>Name</th>
+                        <th>Designation</th>
+                        <th>Email</th>
+                        <th>Net Pay</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedFile = null;
+let generatedEmployees = [];
+let currentMonth = '';
+
+function handleFileSelect(e) {
+    selectedFile = e.target.files[0];
+    if (selectedFile) {
+        document.getElementById('fileLabel').textContent = '✓ ' + selectedFile.name;
+        document.getElementById('fileDrop').classList.add('has-file');
+    }
+}
+
+function showStatus(msg, type) {
+    const s = document.getElementById('status');
+    s.className = type;
+    s.textContent = msg;
+    s.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function downloadCurrent() { window.location.href = '/download-current'; }
+
+function downloadByMonth() {
+    const month = document.getElementById('month').value;
+    const year = document.getElementById('year').value;
+    window.location.href = `/download?month=${month}&year=${year}`;
+}
+
+function uploadCSV() {
+    if (!selectedFile) { showStatus('Please select a file first.', 'error'); return; }
+    const formData = new FormData();
+    formData.append('csv_file', selectedFile);
+    formData.append('month', document.getElementById('month').value);
+    formData.append('year', document.getElementById('year').value);
+    currentMonth = document.getElementById('month').value;
+    showStatus('⏳ Processing payslips, please wait...', 'processing');
+
+    fetch('/upload', { method: 'POST', body: formData })
+        .then(r => {
+            if (r.status === 401) { window.location.href = '/login'; return null; }
+            return r.json();
+        })
+        .then(data => {
+            if (!data) return;
+            if (data.error) { showStatus(data.error, 'error'); return; }
+            let msg = data.message || 'Payslips generated successfully';
+            if (data.warning) msg += '\n\n⚠️ ' + data.warning;
+            showStatus(msg, data.warning ? 'processing' : 'success');
+            document.getElementById('downloadCurrentBtn').disabled = false;
+            const preview = Array.isArray(data.preview) ? data.preview : [];
+            generatedEmployees = preview;
+            document.getElementById('statTotal').textContent = preview.length;
+            document.getElementById('statGenerated').textContent = preview.length;
+            document.getElementById('statsSection').style.display = 'grid';
+            if (preview.length > 0) {
+                document.getElementById('emailBtn').disabled = false;
+                document.getElementById('whatsappBtn').disabled = false;
+            }
+            renderTable(preview);
+        })
+        .catch(err => showStatus('Error: ' + err.message, 'error'));
+}
+
+function renderTable(preview) {
+    const tbody = document.querySelector('#previewTable tbody');
+    tbody.innerHTML = '';
+    if (!preview.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:24px;color:rgba(17,34,78,0.4);">Payslips generated. Preview unavailable.</td></tr>`;
+    } else {
+        preview.forEach(emp => {
+            tbody.innerHTML += `<tr>
+                <td><strong>${emp.EMP_ID || '—'}</strong></td>
+                <td>${emp.Name || '—'}</td>
+                <td style="color:rgba(17,34,78,0.55)">${emp.Designation || '—'}</td>
+                <td style="color:rgba(17,34,78,0.55)">${emp.Email || '—'}</td>
+                <td><strong>₹ ${parseFloat(emp.Net_Pay || 0).toLocaleString('en-IN', {minimumFractionDigits:2})}</strong></td>
+                <td><span class="status-pill pill-generated">✓ Generated</span></td>
+            </tr>`;
+        });
+    }
+    document.getElementById('tableCard').style.display = 'block';
+}
+
+function sendEmails() {
+    if (!generatedEmployees.length) { showStatus('No payslips to send.', 'error'); return; }
+    showStatus('📧 Sending emails...', 'processing');
+    document.getElementById('emailBtn').disabled = true;
+    fetch('/send-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employees: generatedEmployees, month: currentMonth })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) { showStatus(data.error, 'error'); document.getElementById('emailBtn').disabled = false; return; }
+        showStatus(data.message, 'success');
+        document.getElementById('statEmails').textContent = data.sent_count || 0;
+        if (data.results) updateTableStatus(data.results, 'email');
+        document.getElementById('emailBtn').disabled = false;
+    })
+    .catch(err => { showStatus('Email failed: ' + err.message, 'error'); document.getElementById('emailBtn').disabled = false; });
+}
+
+function sendWhatsApp() {
+    if (!generatedEmployees.length) { showStatus('No payslips to send.', 'error'); return; }
+    showStatus('💬 Sending WhatsApp messages...', 'processing');
+    document.getElementById('whatsappBtn').disabled = true;
+    fetch('/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employees: generatedEmployees, month: currentMonth })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            if (data.error.toLowerCase().includes('template')) {
+                showStatus('⏳ WhatsApp template is still under review by Meta. Please try again once approved (usually within 30 minutes).', 'processing');
+            } else {
+                showStatus(data.error, 'error');
+            }
+            document.getElementById('whatsappBtn').disabled = false;
+            return;
+        }
+        showStatus('✅ ' + data.message, 'success');
+        document.getElementById('statWhatsapp').textContent = data.sent_count || 0;
+        if (data.results) updateTableStatus(data.results, 'whatsapp');
+        document.getElementById('whatsappBtn').disabled = false;
+    })
+    .catch(err => { showStatus('WhatsApp failed: ' + err.message, 'error'); document.getElementById('whatsappBtn').disabled = false; });
+}
+
+function updateTableStatus(results, type) {
+    const rows = document.querySelectorAll('#previewTable tbody tr');
+    results.forEach((result, i) => {
+        if (!rows[i]) return;
+        const cell = rows[i].querySelector('td:last-child');
+        if (result.Status === 'Sent') {
+            const cls = type === 'whatsapp' ? 'pill-whatsapp' : 'pill-emailed';
+            const icon = type === 'whatsapp' ? '✓ WhatsApp' : '✓ Emailed';
+            cell.innerHTML = `<span class="status-pill ${cls}">${icon}</span>`;
+        } else {
+            cell.innerHTML = `<span class="status-pill pill-failed">✗ Failed</span>`;
+        }
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const months = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+    document.getElementById('month').value = months[new Date().getMonth()];
+});
+</script>
+</body>
+</html>

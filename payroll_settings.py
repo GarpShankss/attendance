@@ -18,6 +18,17 @@ DEFAULTS = {
     "esi_eligibility_ceiling":   20999,
     "professional_tax_amount":   200,
     "professional_tax_threshold": 25000,
+    "working_days":              0,
+    "attendance_policy": {
+        "P":  { "name": "Present",         "present": 1,   "paid": True,  "lop": 0 },
+        "HP": { "name": "Holiday Present", "present": 1,   "paid": True,  "lop": 0 },
+        "SL": { "name": "Sick Leave",      "present": 1,   "paid": True,  "lop": 0 },
+        "PL": { "name": "Paid Leave",      "present": 1,   "paid": True,  "lop": 0 },
+        "HL": { "name": "Half Leave",      "present": 0.5, "paid": True,  "lop": 0.5 },
+        "A":  { "name": "Absent",          "present": 0,   "paid": False, "lop": 1 },
+        "WO": { "name": "Week Off",        "present": 0,   "paid": True,  "lop": 0 },
+        "CO": { "name": "Comp Off",        "present": 1,   "paid": True,  "lop": 0 }
+    }
 }
 
 

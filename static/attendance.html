@@ -1,6 +1,11 @@
 <!doctype html>
 <html>
 <head>
+<script>
+  if (localStorage.getItem('rs_auth') !== 'authenticated') {
+    window.location.href = '/login.html';
+  }
+</script>
 <meta charset="utf-8">
 <title>Attendance Module</title>
 <style>
@@ -81,18 +86,31 @@
     width: 34px; text-align: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
     padding: 4px; font-size: 11px; text-transform: uppercase; color: #000; font-weight: bold;
   }
-  table.att input.day-inp.status-p  { background: #a7f3d0; color: #065f46; }
-  table.att input.day-inp.status-sl { background: #fde68a; color: #92400e; }
-  table.att input.day-inp.status-pl { background: #fbcfe8; color: #9d174d; }
-  table.att input.day-inp.status-hp { background: #bfdbfe; color: #1e40af; }
-  table.att input.day-inp.status-a  { background: #fca5a5; color: #991b1b; }
+  table.att input.day-inp.status-p  { background: #10b981; color: #ffffff; } /* Green */
+  table.att input.day-inp.status-wo { background: #3b82f6; color: #ffffff; } /* Blue */
+  table.att input.day-inp.status-h  { background: #f97316; color: #ffffff; } /* Orange */
+  table.att input.day-inp.status-cl { background: #8b5cf6; color: #ffffff; } /* Purple */
+  table.att input.day-inp.status-sl { background: #14b8a6; color: #ffffff; } /* Teal */
+  table.att input.day-inp.status-pl { background: #047857; color: #ffffff; } /* Dark Green */
+  table.att input.day-inp.status-hl { background: #eab308; color: #ffffff; } /* Yellow */
+  table.att input.day-inp.status-a  { background: #ef4444; color: #ffffff; } /* Red */
   table.att input.day-inp.status-blank { background: rgba(17, 24, 39, 0.8); color: #f3f4f6; }
 
-  th.weekend { background: rgba(59, 130, 246, 0.15); }
-  td.weekend input { background: rgba(59, 130, 246, 0.08) !important; color: #f3f4f6; }
+  th.weekend { background: rgba(59, 130, 246, 0.15) !important; }
+  td.weekend input.status-blank { background: rgba(59, 130, 246, 0.08); color: #f3f4f6; }
+  
+  th.next-cycle, td.next-cycle { opacity: 0.6; border-left: 2px dashed rgba(255,255,255,0.2) !important; }
+  th.next-cycle { background: rgba(0,0,0,0.3); }
+  
+  th.th-abm { background: rgba(224, 231, 255, 0.8) !important; color: #3730a3 !important; }
+  th.th-acm { background: rgba(220, 252, 231, 0.8) !important; color: #166534 !important; }
+  td.td-abm { background: rgba(224, 231, 255, 0.05); }
+  td.td-acm { background: rgba(220, 252, 231, 0.05); }
 
   .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; }
   .btn-save-all { background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 600; }
+  .btn-att-save { background: rgba(5, 150, 105, 0.1); color: #34d399; border: 1px solid rgba(5, 150, 105, 0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+  .btn-att-save:hover { background: #059669; color: white; }
   .btn-att-delete { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
   .btn-att-delete:hover { background: #ef4444; color: white; }
   
@@ -103,6 +121,9 @@
   .leg-sl { background: #fde68a; color: #92400e; }
   .leg-pl { background: #fbcfe8; color: #9d174d; }
   .leg-hp { background: #bfdbfe; color: #1e40af; }
+  .leg-hl { background: #d8b4fe; color: #581c87; }
+  .leg-wo { background: #67e8f9; color: #083344; }
+  .leg-co { background: #bbf7d0; color: #14532d; }
   .leg-a  { background: #fca5a5; color: #991b1b; }
 </style>
 </head>
@@ -139,8 +160,11 @@
     <span class="leg-sl">SL = Sick Leave</span>
     <span class="leg-pl">PL = Paid Leave</span>
     <span class="leg-hp">HP = Holiday Present</span>
+    <span class="leg-hl">HL = Half Leave</span>
+    <span class="leg-co">CO = Comp Off</span>
+    <span class="leg-wo">WO = Week Off</span>
     <span class="leg-a">A = Absent</span>
-    <em style="font-size:12px;">P, SL, PL, HP count as paid days; blank Sunday is paid weekoff.</em>
+    <em style="font-size:12px;">P, HP, SL, PL, CO, WO count as 1 paid day. HL counts as 0.5. CO counts as present.</em>
   </div>
 </section>
 
@@ -164,10 +188,18 @@ let WAREHOUSES = {};
 let currentLocation = "", currentWarehouse = "";
 let currentMonth = 0, currentYear = 0;
 let currentPeriodDates = [];
+let currentPolicy = {};
 
 function esc(v) {
   return String(v ?? '').replace(/[&<>"]/g, m =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+}
+
+function localISODate(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 async function boot() {
@@ -182,6 +214,14 @@ async function boot() {
   });
 
   populateMonthYear();
+
+  function autoRefresh() {
+    if (document.getElementById('attLocation').value && document.getElementById('attWarehouse').value) {
+      loadAttendance();
+    }
+  }
+  document.getElementById('attMonth').addEventListener('change', autoRefresh);
+  document.getElementById('attYear').addEventListener('change', autoRefresh);
 }
 
 function populateWarehouse() {
@@ -206,8 +246,9 @@ function populateMonthYear() {
 }
 
 function getPayrollPeriodDates(month, year) {
+  // Payroll period from 26th of previous month to the 25th of the current month
   const start = new Date(year, month - 2, 26);
-  const end = new Date(year, month - 1, 25);
+  const end = new Date(year, month - 1, 25); // 25th of current month
   const dates = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     dates.push(new Date(d));
@@ -234,10 +275,11 @@ async function loadAttendance() {
   const res  = await fetch('/attendance/employees?' + params.toString());
   if (!res.ok) { alert('Failed to load employees: ' + await res.text()); return; }
   const data = await res.json();
+  currentPolicy = data.policy || {};
 
   currentPeriodDates = getPayrollPeriodDates(currentMonth, currentYear);
   document.getElementById('attTitle').textContent =
-    `${MONTH_NAMES[currentMonth]} ${currentYear} (26th-to-25th period) — ${currentLocation} / ${currentWarehouse}`;
+    `${MONTH_NAMES[currentMonth]} ${currentYear} — ${currentLocation} / ${currentWarehouse}`;
   document.getElementById('attSection').style.display = '';
   renderTable(data.employees);
 }
@@ -246,58 +288,194 @@ function renderTable(employees) {
   const dates = currentPeriodDates;
   const DAY_ABBR = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
-  let head = '<thead><tr>'
-    + '<th style="min-width:70px;">Action</th>'
-    + '<th style="min-width:90px;">ID</th>'
-    + '<th style="min-width:140px;">Name</th>';
+  let abmCount = 0;
+  let acmCount = 0;
+  for (const date of dates) {
+    if (date.getMonth() === (currentMonth - 2 < 0 ? 11 : currentMonth - 2)) abmCount++;
+    else acmCount++;
+  }
+
+  let head = `<thead>
+    <tr>
+      <th colspan="5" style="background:#fef3c7; color:#92400e; text-align:center;">Employee Details</th>
+      <th colspan="${abmCount}" style="background:#e0e7ff; color:#3730a3; text-align:center;">ABM (Attendance Before Month)</th>
+      <th colspan="${acmCount}" style="background:#dcfce7; color:#166534; text-align:center;">ACM (Attendance Current Month)</th>
+      <th colspan="7" style="background:#fef3c7; color:#92400e; text-align:center;">Summary</th>
+    </tr>
+    <tr>
+      <th style="min-width:70px; background:#fef3c7; color:#92400e;">Action</th>
+      <th style="min-width:90px; background:#fef3c7; color:#92400e;">ID</th>
+      <th style="min-width:140px; background:#fef3c7; color:#92400e;">Name</th>
+      <th style="min-width:120px; background:#fef3c7; color:#92400e;">Department</th>
+      <th style="min-width:120px; background:#fef3c7; color:#92400e;">Designation</th>`;
+
   for (const date of dates) {
     const dow  = date.getDay();
-    const wknd = dow === 0 ? ' class="weekend"' : '';
-    head += `<th${wknd}>${date.getDate()}<br><small>${MONTH_NAMES[date.getMonth() + 1]}</small></th>`;
+    let classes = [];
+    
+    const isABM = date.getMonth() === (currentMonth - 2 < 0 ? 11 : currentMonth - 2);
+    if (isABM) classes.push('th-abm');
+    else classes.push('th-acm');
+    
+    if (dow === 0) classes.push('weekend');
+    if (date.getDate() > 25 && date.getMonth() === currentMonth - 1) classes.push('next-cycle');
+    
+    const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
+    head += `<th${classAttr}>${date.getDate()}</th>`;
   }
-  head += '<th>Present</th><th class="absent">Absent</th><th>Pay Days</th></tr></thead>';
+  
+  head += `<th style="background:#fef3c7; color:#92400e;">Working Days</th>
+           <th style="background:#fef3c7; color:#92400e;">Present Days</th>
+           <th style="background:#fef3c7; color:#92400e;">Paid Days</th>
+           <th style="background:#fef3c7; color:#92400e;">LOP</th>
+           <th style="background:#fef3c7; color:#92400e;" class="absent">Absent Days</th>
+           <th style="background:#e0e7ff; color:#3730a3;">Total ABM</th>
+           <th style="background:#dcfce7; color:#166534;">Total ACM</th>
+         </tr>
+       </thead>`;
 
   let body = '<tbody>';
   for (const emp of employees) {
-    body += `<tr data-emp-id="${esc(emp.emp_id)}">`;
-    body += `<td><button class="btn-att-delete" onclick="deleteAttendanceEmployee('${esc(emp.emp_id)}')">Delete</button></td>`;
+    body += `<tr data-emp-id="${esc(emp.emp_id)}" data-working-days="${emp.working_days || 0}" data-working-source="${esc(emp.working_source || 'Unknown')}">`;
+    body += `<td>
+      <div style="display:flex; gap:4px; justify-content:center;">
+        <button class="btn-att-save" onclick="saveAttendanceEmployee('${esc(emp.emp_id)}')">Save</button>
+        <button class="btn-att-delete" onclick="deleteAttendanceEmployee('${esc(emp.emp_id)}')">Del</button>
+      </div>
+    </td>`;
     body += `<td class="emp-info">${esc(emp.emp_id)}</td>`;
     body += `<td class="emp-info">${esc(emp.emp_name)}</td>`;
-    for (const date of dates) {
-      const key = date.toISOString().slice(0, 10);
-      const fallback = emp.days[String(date.getDate())];
-      const val = ((emp.days[key] !== undefined ? emp.days[key] : fallback) || '').toString().toUpperCase();
-      const dow  = date.getDay();
-      const wknd = dow === 0 ? ' weekend' : '';
-      const cls = val === 'P' ? 'status-p' : val === 'SL' ? 'status-sl' : val === 'PL' ? 'status-pl' : val === 'HP' ? 'status-hp' : val === 'A' ? 'status-a' : 'status-blank';
-      body += `<td class="${wknd}"><input class="day-inp ${cls}" type="text" maxlength="2"`
-            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)"></td>`;
+    body += `<td class="emp-info">${esc(emp.department || '')}</td>`;
+    body += `<td class="emp-info">${esc(emp.designation || '')}</td>`;
+    
+    let working = 0, present = emp.present_days || 0, absent = emp.absent_days || 0;
+    let dayCells = '';
+    
+    let dojDate = null;
+    if (emp.doj) {
+      let parts = emp.doj.split(/[-.\/ ]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) dojDate = new Date(parts[0], parts[1]-1, parts[2]);
+        else if (parts[2].length === 4) dojDate = new Date(parts[2], parts[1]-1, parts[0]);
+      }
     }
-    body += `<td class="summary" data-type="present">${emp.present_days||0}</td>`;
-    body += `<td class="summary absent" data-type="absent">${emp.absent_days||0}</td>`;
-    body += `<td class="summary" data-type="pay">${emp.pay_days||0}</td>`;
+
+    for (const date of dates) {
+      const key = localISODate(date);
+      const fallback = emp.days[String(date.getDate())];
+      let val = ((emp.days[key] !== undefined ? emp.days[key] : fallback) || '').toString().toUpperCase();
+      const dow  = date.getDay();
+      
+      let disabledAttr = '';
+      if (dojDate && date < dojDate) {
+         disabledAttr = ' disabled style="background:rgba(255,255,255,0.05); color:transparent; cursor:not-allowed;" title="Before DOJ"';
+         val = '';
+      }
+      
+      if (dow === 0 && !val && !disabledAttr) {
+        val = 'WO';
+      }
+      
+      let classes = [];
+      const isABM = date.getMonth() === (currentMonth - 2 < 0 ? 11 : currentMonth - 2);
+      if (isABM) classes.push('td-abm');
+      else classes.push('td-acm');
+      
+      if (dow === 0) classes.push('weekend');
+      if (date.getDate() > 25 && date.getMonth() === currentMonth - 1) classes.push('next-cycle');
+      const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
+
+      const valid = Object.keys(currentPolicy);
+      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : 'status-blank';
+      dayCells += `<td${classAttr}><input class="day-inp ${cls}" type="text" maxlength="2"`
+            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)"${disabledAttr}></td>`;
+            
+      const v = val.toLowerCase();
+      // Initial render doesn't compute working/present; we'll recalculate exactly at the end
+    }
+    
+    body += dayCells;
+    body += `<td class="summary" data-type="working">0</td>`;
+    body += `<td class="summary" data-type="present">0</td>`;
+    body += `<td class="summary" data-type="pay">0</td>`;
+    body += `<td class="summary" data-type="lop">0</td>`;
+    body += `<td class="summary absent" data-type="absent">0</td>`;
+    body += `<td class="summary" data-type="abm" style="background: rgba(224, 231, 255, 0.1);">0</td>`;
+    body += `<td class="summary" data-type="acm" style="background: rgba(220, 252, 231, 0.1);">0</td>`;
     body += '</tr>';
   }
   body += '</tbody>';
   document.getElementById('attTable').innerHTML = head + body;
+  
+  // Re-run summary computation for all rows to ensure exact 26th-25th calculation
+  document.querySelectorAll('#attTable tbody tr').forEach(tr => {
+    const firstInp = tr.querySelector('input.day-inp');
+    if (firstInp) onDayInput(firstInp);
+  });
 }
 
 function onDayInput(inp) {
-  const val = inp.value.trim().toUpperCase();
-  inp.value = val;
-  inp.className = 'day-inp '
-    + (val==='P'?'status-p':val==='SL'?'status-sl':val==='PL'?'status-pl':val==='HP'?'status-hp':val==='A'?'status-a':'status-blank');
+  let uiVal = inp.value.trim().toUpperCase();
+  inp.value = uiVal;
+
+  let logicalVal = uiVal;
+  if (!uiVal) {
+     const dt = new Date(inp.dataset.day);
+     if (dt.getDay() === 0) logicalVal = 'WO';
+     else logicalVal = 'A';
+  }
+
+  const valid = Object.keys(currentPolicy);
+  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : 'status-blank';
+  inp.className = 'day-inp ' + cls;
+
   // live summary
   const tr = inp.closest('tr');
-  let present = 0, absent = 0;
+  let present = 0, absent = 0, lop = 0;
+  let abmTotal = 0, acmTotal = 0;
+  const working = parseFloat(tr.dataset.workingDays) || 0;
+  const workingSource = tr.dataset.workingSource || "Unknown";
+  
+  const cutoffStart = localISODate(new Date(currentYear, currentMonth - 2, 26));
+  const cutoffEnd = localISODate(new Date(currentYear, currentMonth - 1, 25));
+
   tr.querySelectorAll('input.day-inp').forEach(i => {
-    const v = i.value.trim().toLowerCase();
-    if (PAY_STATUSES.has(v)) present++;
-    else if (v === 'a') absent++;
+    const dStr = i.dataset.day;
+    let v = i.value.trim().toUpperCase();
+    if (!v) {
+       const dt = new Date(dStr);
+       if (dt.getDay() === 0) v = 'WO';
+       else v = 'A';
+    }
+
+    const isABM = i.closest('td').classList.contains('td-abm');
+    if (currentPolicy[v]) {
+       let pDay = currentPolicy[v].paid ? 1 : 0;
+       if (isABM) abmTotal += pDay;
+       else acmTotal += pDay;
+    }
+
+    if (dStr >= cutoffStart && dStr <= cutoffEnd) {
+      if (currentPolicy[v]) {
+         lop += currentPolicy[v].lop || 0;
+         if (v === 'A' || (currentPolicy[v].name && currentPolicy[v].name.toLowerCase() === 'absent')) absent += 1;
+      } else {
+         lop += 1;
+         absent += 1;
+      }
+    }
   });
+  
+  const pay = Math.max(0, working - lop);
+  present = pay;  // Present Days is padded to match Working Days - LOP
+  
+  tr.querySelector('[data-type="working"]').textContent = working;
   tr.querySelector('[data-type="present"]').textContent = present;
   tr.querySelector('[data-type="absent"]').textContent  = absent;
-  tr.querySelector('[data-type="pay"]').textContent     = present;
+  tr.querySelector('[data-type="pay"]').textContent     = pay;
+  tr.querySelector('[data-type="lop"]').textContent     = lop;
+  tr.querySelector('[data-type="abm"]').textContent     = abmTotal;
+  tr.querySelector('[data-type="acm"]').textContent     = acmTotal;
 }
 
 async function saveAllAttendance() {
@@ -343,18 +521,64 @@ async function saveAllAttendance() {
   }
 }
 
+async function saveAttendanceEmployee(empId) {
+  const statusEl = document.getElementById('attStatus');
+  statusEl.style.color = 'green';
+  statusEl.textContent = `Saving ${empId}...`;
+
+  const tr = document.querySelector(`tr[data-emp-id="${esc(empId)}"]`);
+  if (!tr) return;
+
+  const days  = {};
+  tr.querySelectorAll('input.day-inp').forEach(inp => {
+    days[inp.dataset.day] = inp.value.trim().toUpperCase();
+  });
+
+  try {
+    const res = await fetch(
+      `/attendance/${encodeURIComponent(currentLocation)}`
+      + `/${encodeURIComponent(currentWarehouse)}`
+      + `/${encodeURIComponent(empId)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month: currentMonth, year: currentYear, days }),
+      }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    statusEl.textContent = `Saved ${empId} \u2713`;
+    setTimeout(() => { if(statusEl.textContent.includes(empId)) statusEl.textContent = ''; }, 3000);
+  } catch (e) {
+    console.error('Failed to save', empId, e);
+    statusEl.style.color = 'red';
+    statusEl.textContent = `Failed to save ${empId}`;
+  }
+}
+
 async function deleteAttendanceEmployee(empId) {
-  if (!confirm(`Delete attendance and payroll for ${empId} from ${currentLocation}/${currentWarehouse}?`)) {
+  let scope = '';
+  if (confirm(`Do you want to permanently delete employee ${empId} from ${currentLocation}/${currentWarehouse} for ALL months?\n\n(This deletes the master record and all historical data)`)) {
+    scope = 'all';
+  } else if (confirm(`Do you want to delete employee ${empId} for the CURRENT selected month ONLY?\n\n(This preserves the master record and other months)`)) {
+    scope = 'month';
+  } else {
     return;
   }
+
   const statusEl = document.getElementById('attStatus');
   statusEl.style.color = 'green';
   statusEl.textContent = 'Deleting...';
   try {
-    const res = await fetch(
-      `/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(empId)}`,
-      { method: 'DELETE' }
-    );
+    let url = `/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(empId)}?scope=${scope}`;
+    if (scope === 'month') {
+      if (!currentMonth || !currentYear) {
+        alert("Please select a Month and Year to delete for a single month.");
+        statusEl.textContent = '';
+        return;
+      }
+      url += `&month=${currentMonth}&year=${currentYear}`;
+    }
+    const res = await fetch(url, { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text());
     statusEl.textContent = `Deleted ${empId} ✓`;
     loadAttendance();

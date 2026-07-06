@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Payslip Generator</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f8;
+            padding: 40px;
+        }
+        .box {
+            background: white;
+            padding: 30px;
+            max-width: 500px;
+            margin: auto;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+        }
+        input[type=file], button {
+            width: 100%;
+            margin-top: 15px;
+            padding: 10px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .msg {
+            margin-top: 15px;
+            color: green;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Payslip Generator</h2>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class=\"msg\">
+              {{ messages[0] }}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        <form method=\"POST\" enctype=\"multipart/form-data\">
+            <input type=\"file\" name=\"file\" accept=\".csv\" required>
+            <button type=\"submit\">Generate Payslips</button>
+        </form>
+    </div>
+</body>
+</html>
+

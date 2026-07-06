@@ -18,13 +18,18 @@ from datetime import datetime
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
+import calendar
+from datetime import timedelta
 
 from mongo_loader import load_sheet_into_collection, guess_warehouse
 from parse_excel import parse_workbook, drop_empty_columns
 from warehouses_config import LOCATIONS
 from salary_calc import recalculate
+from payroll_settings import get_config
 from payroll_settings import get_config, save_config
 from payroll_records import generate_monthly_payroll, get_payroll
+from payslip_pdf import generate_and_upload_payslip
+from whatsapp_utils import send_payslip_whatsapp
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "payroll_db")
@@ -36,8 +41,7 @@ app = FastAPI()
 
 # internal/meta fields - never shown as a data column, never editable
 HIDDEN_FIELDS = {"_id", "_row_id", "_source_file", "_sheet", "_location", "_warehouse",
-                 "_upload_month", "_upload_year", "created_at", "updated_at", "status", "identity",
-                 "emp_name", "month", "year", "location", "warehouse"}
+                 "_upload_month", "_upload_year", "created_at", "updated_at", "status", "identity"}
 
 # token -> temp file path, held between /upload/preview and /upload/confirm
 PENDING_UPLOADS = {}
@@ -327,6 +331,7 @@ def _normalize_subdoc(value):
 
 def _flatten_doc(doc: dict):
     flat = {}
+    flat["_id"] = str(doc.get("_id")) if doc.get("_id") else None
     for container in ("identity", "salary", "attendance", "earnings", "deductions", "contributions"):
         value = doc.get(container)
         if isinstance(value, dict):
@@ -348,6 +353,11 @@ def _flatten_doc(doc: dict):
 
 
 def _row_filter(name: str, row_id: str):
+    from bson.objectid import ObjectId
+    # Check if row_id is a 24-char hex string (MongoDB _id)
+    if len(row_id) == 24 and all(c in '0123456789abcdefABCDEF' for c in row_id):
+        return {"_id": ObjectId(row_id)}
+    
     if name == "payroll_records":
         if row_id.isdigit():
             return {"_row_id": int(row_id)}
@@ -388,6 +398,12 @@ def _map_payroll_updates(name: str, to_write: dict, stored: dict = None):
             contributions_updates[key] = value
         elif key in ("emp_id", "emp_name", "location", "warehouse", "month", "year", "status"):
             mapped[key] = value
+        elif key == "Mobile Number" or key == "mobile_number":
+            mapped["mobile_number"] = value
+            identity_updates["Mobile Number"] = value
+            identity_updates["mobile_number"] = value
+        elif key in ("Fixed Basic", "Fixed DA", "Fixed Other", "Leave", "Bonus", "Fixed SC", "Uniform", "Shoes", "T Shirt", "Fixed Gross"):
+            salary_updates[key] = value
         else:
             identity_updates[key] = value
 
@@ -500,6 +516,7 @@ def get_filtered_data(location: str = None, warehouse: str = None,
                     columns.append(k)
             rows.append({
                 "_collection": name,
+                "_id": str(d.get("_id")) if d.get("_id") else "",
                 "_row_id": d.get("_row_id", d.get("emp_id")),
                 "_sheet": d.get("_sheet"), "_warehouse": d.get("_warehouse"),
                 "_upload_month": d.get("_upload_month"), "_upload_year": d.get("_upload_year"),
@@ -535,57 +552,56 @@ def add_row(name: str, payload: dict = Body(...)):
 
 @app.put("/collections/{name}/{row_id}")
 def save_row(name: str, row_id: str, payload: dict = Body(...)):
-    """Recalculate and save. Reads FIXED inputs from MongoDB (never from payload)
-    so stale/string frontend values can never corrupt salary inputs."""
+    """Recalculate and save. Accepts edits to Fixed and Employee Info fields,
+    rejects edits to calculated/attendance fields, runs engine, saves all."""
     if name not in db.list_collection_names():
         raise HTTPException(404, "Unknown collection")
     import re as _re
-    from salary_calc import COLUMN_MAP, READONLY_FIELDS
+    from salary_calc import COLUMN_MAP, recalculate
 
     def _clean_key(k):
         return _re.sub(r'[\s]+', ' ', str(k)).strip()
 
-    # Fetch the authoritative row from MongoDB
     stored = db[name].find_one(_row_filter(name, row_id))
     if not stored:
         raise HTTPException(404, "row not found")
 
     flattened = _flatten_doc(stored)
-    # Build base from stored document (clean keys)
     base = {_clean_key(k): v for k, v in flattened.items() if k != "_id"}
 
-    # Apply only non-readonly edits from payload on top of stored values
-    readonly_cols = {_clean_key(COLUMN_MAP[f]) for f in READONLY_FIELDS if f in COLUMN_MAP}
+    # Frontend read-only columns (Attendance + Calculated)
+    FRONTEND_READONLY = {
+        'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
+        'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 
+        'EARNING - Bonus @8.33%', 'EARNING - OT Amount', 'EARNING - Total',
+        'Deductions - PF 12%', 'Deductions - ESIC 0.75%', 'Deductions - PT', 'Deductions - Total Deduction',
+        'CONTRIBUTION - EPF @ 13%', 'CONTRIBUTION - ESIC @ 3.25%', 'CONTRIBUTION - Total Employer Contribution',
+        'CONTRIBUTION - CTC', 'CONTRIBUTION - Total CTC', 'Net Pay'
+    }
+
+    # 1. Apply editable fields from payload to base
+    editable_updates = {}
     for k, v in payload.items():
         ck = _clean_key(k)
-        if ck not in readonly_cols and ck not in {_clean_key(h) for h in HIDDEN_FIELDS}:
+        if ck not in FRONTEND_READONLY and ck not in {_clean_key(h) for h in HIDDEN_FIELDS}:
             base[ck] = v
+            editable_updates[ck] = v
 
-    # Run salary calculation
+    # 2. Run salary calculation on the updated base
     calculated = recalculate(base)
     calc_log = calculated.pop("__calc_log__", [])
 
-    # Only write output (non-readonly) columns back to MongoDB
-    output_col_names = {
-        _clean_key(COLUMN_MAP[f])
-        for f in COLUMN_MAP
-        if f not in READONLY_FIELDS and COLUMN_MAP[f]
-    }
-    to_write = {_clean_key(k): v for k, v in calculated.items()
-                if _clean_key(k) in output_col_names}
-
-    # Persist editable input fields as well (advance/service/shoes/tshirt/uniform)
-    editable_inputs = {}
-    for k, v in payload.items():
-        ck = _clean_key(k)
-        if ck not in readonly_cols and ck not in {_clean_key(h) for h in HIDDEN_FIELDS}:
-            editable_inputs[ck] = v
+    # 3. Write ALL changes (editable inputs + newly calculated outputs) back to Mongo
+    to_write = {}
+    for k, v in editable_updates.items():
+        to_write[k] = v
+    for k, v in calculated.items():
+        if _clean_key(k) in {_clean_key(val) for val in COLUMN_MAP.values() if val}:
+            to_write[_clean_key(k)] = v
 
     updates = {}
     if to_write:
         updates.update(_map_payroll_updates(name, to_write, stored=stored))
-    if editable_inputs:
-        updates.update(_map_payroll_updates(name, editable_inputs, stored=stored))
 
     if not updates:
         raise HTTPException(400, "No columns to update")
@@ -655,134 +671,110 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
         raise HTTPException(404, "No payroll records found for the selected criteria.")
 
     flat_docs = [_flatten_doc(d) for d in docs]
-    
-    # Get columns (excluding hidden fields)
-    columns, seen = [], set()
-    for d in flat_docs:
-        for k in d.keys():
-            if k not in HIDDEN_FIELDS and k not in seen:
-                seen.add(k)
-                columns.append(k)
 
-    # Create Excel
+    COLUMN_GROUPS = [
+        ("Employee Details", ["emp_id", "emp_name", "location", "warehouse", "Designation", "Department", "status", "DOJ", "Bank Account Number", "Bank Name", "IFSC", "UAN", "ESI Number", "PAN", "Email", "Mobile Number"]),
+        ("Fixed", ["Fixed Basic", "Fixed DA", "Fixed Other", "Leave", "Bonus", "Fixed SC", "Uniform", "Shoes", "T Shirt", "Fixed Gross"]),
+        ("Attendance", ["ATTENDANCE - Working Days", "ATTENDANCE - Present Days", "ATTENDANCE - Pay Days", "ATTENDANCE - LOP", "ATTENDANCE - Absent Days"]),
+        ("Earned", ["EARNING - Basic", "EARNING - DA", "EARNING - Other", "EARNING - Leave", "EARNING - Bonus", "Total Earnings"]),
+        ("Deductions", ["Deductions - PF 12%", "Deductions - ESIC 0.75%", "Deductions - PT", "Deductions - Advance", "Total Deduction"]),
+        ("Employer Contribution", ["CONTRIBUTION - PF 13%", "CONTRIBUTION - ESIC @ 3.25%", "Employer Contribution"]),
+        ("CTC", ["CTC", "CONTRIBUTION - Service Charge", "CONTRIBUTION - Uniform Charges", "CONTRIBUTION - T Shirt", "CONTRIBUTION - Shoes", "Total CTC"]),
+        ("Net Pay", ["net_pay"])
+    ]
+
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = f"Payroll_{month}_{year}"
 
-    # Write headers
-    ws.append(columns)
+    fill_group = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+    fill_header = PatternFill(start_color="EFF6FF", end_color="EFF6FF", fill_type="solid")
+    font_bold = Font(bold=True, color="FFFFFF")
+    font_header = Font(bold=True, color="1E3A8A")
+    align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border_thin = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # Write rows
+    # Row 1: Groups
+    col_idx = 1
+    for group_name, cols in COLUMN_GROUPS:
+        start_col = col_idx
+        end_col = col_idx + len(cols) - 1
+        ws.merge_cells(start_row=1, start_column=start_col, end_row=1, end_column=end_col)
+        cell = ws.cell(row=1, column=start_col, value=group_name)
+        cell.fill = fill_group
+        cell.font = font_bold
+        cell.alignment = align_center
+        cell.border = border_thin
+        # Apply border to all merged cells
+        for c in range(start_col, end_col + 1):
+            ws.cell(row=1, column=c).border = border_thin
+        col_idx = end_col + 1
+
+    # Row 2: Columns
+    col_idx = 1
+    all_columns = []
+    for group_name, cols in COLUMN_GROUPS:
+        for c_name in cols:
+            all_columns.append(c_name)
+            cell = ws.cell(row=2, column=col_idx, value=c_name.replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", ""))
+            cell.fill = fill_header
+            cell.font = font_header
+            cell.alignment = align_center
+            cell.border = border_thin
+            col_idx += 1
+
+    # Data Rows
+    row_idx = 3
     for d in flat_docs:
-        row_data = [d.get(c) for c in columns]
-        ws.append(row_data)
+        for c_idx, c_name in enumerate(all_columns, start=1):
+            val = d.get(c_name)
+            if c_name == "emp_name" and not val:
+                val = d.get("Employee Name", "")
+            cell = ws.cell(row=row_idx, column=c_idx, value=val)
+            cell.border = border_thin
+            if isinstance(val, (int, float)):
+                cell.number_format = '#,##0.00'
+        row_idx += 1
+
+    # Totals Row
+    ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=len(COLUMN_GROUPS[0][1]))
+    t_cell = ws.cell(row=row_idx, column=1, value="GRAND TOTAL")
+    t_cell.font = Font(bold=True)
+    t_cell.alignment = align_center
+    t_cell.border = border_thin
+    for c in range(1, len(COLUMN_GROUPS[0][1]) + 1):
+        ws.cell(row=row_idx, column=c).border = border_thin
+
+    for c_idx, c_name in enumerate(all_columns, start=1):
+        if c_idx > len(COLUMN_GROUPS[0][1]): # Skip Employee Details
+            col_letter = get_column_letter(c_idx)
+            cell = ws.cell(row=row_idx, column=c_idx, value=f"=SUM({col_letter}3:{col_letter}{row_idx-1})")
+            cell.font = Font(bold=True)
+            cell.border = border_thin
+            cell.number_format = '#,##0.00'
 
     # Auto-fit columns
     for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 2, 10)
+        max_len = 0
+        for cell in col:
+            if cell.row > 1 and cell.value:
+                max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 2, 30)
 
-    # Save to stream
-    file_stream = io.BytesIO()
-    wb.save(file_stream)
-    file_stream.seek(0)
+    # Freeze panes
+    ws.freeze_panes = "A3"
 
-    filename = f"payroll_{location or 'all'}_{warehouse or 'all'}_{month}_{year}.xlsx"
-    return StreamingResponse(
-        file_stream,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
-
-
-@app.get("/attendance/download")
-def download_attendance(month: int, year: int, location: str = None, warehouse: str = None):
-    from datetime import datetime, timedelta
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
     
-    # Get employees
-    emp_query = {"status": "active"}
-    if location:  emp_query["location"]  = location
-    if warehouse: emp_query["warehouse"] = warehouse
-    
-    employees = list(db["employee_master"].find(emp_query).sort("emp_id", 1))
-    if not employees:
-        raise HTTPException(404, "No active employees found for the selected criteria.")
-        
-    # Generate 26th-to-25th payroll period dates
-    if month == 1:
-        start_year = year - 1
-        start_month = 12
-    else:
-        start_year = year
-        start_month = month - 1
-        
-    start_date = datetime(start_year, start_month, 26)
-    end_date = datetime(year, month, 25)
-    
-    dates = []
-    curr = start_date
-    while curr <= end_date:
-        dates.append(curr)
-        curr += timedelta(days=1)
-        
-    # Define columns
-    columns = ["Emp ID", "Employee Name", "Location", "Warehouse"] + [d.strftime("%Y-%m-%d") for d in dates] + ["Present Days", "Absent Days", "Pay Days"]
-    
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = f"Attendance_{month}_{year}"
-    ws.append(columns)
-    
-    for emp in employees:
-        emp_id = emp["emp_id"]
-        # Find attendance doc
-        att_doc = db["_attendance"].find_one({
-            "emp_id": emp_id, "month": month, "year": year,
-            "location": emp["location"], "warehouse": emp["warehouse"]
-        })
-        
-        days_data = att_doc.get("days", {}) if att_doc else {}
-        row_data = [
-            emp_id,
-            emp.get("emp_name", ""),
-            emp.get("location", ""),
-            emp.get("warehouse", "")
-        ]
-        # Add daily attendance
-        for d in dates:
-            key = d.strftime("%Y-%m-%d")
-            fallback = str(d.day)
-            val = days_data.get(key)
-            if val is None:
-                val = days_data.get(fallback, "")
-            row_data.append(str(val or "").upper())
-            
-        # Add totals
-        row_data.extend([
-            att_doc.get("present_days", 0) if att_doc else 0,
-            att_doc.get("absent_days", 0) if att_doc else 0,
-            att_doc.get("pay_days", 0) if att_doc else 0
-        ])
-        ws.append(row_data)
-        
-    # Auto-fit columns
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 2, 6)
-        
-    file_stream = io.BytesIO()
-    wb.save(file_stream)
-    file_stream.seek(0)
-    
-    filename = f"attendance_{location or 'all'}_{warehouse or 'all'}_{month}_{year}.xlsx"
-    return StreamingResponse(
-        file_stream,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
-
+    headers = {
+        'Content-Disposition': f'attachment; filename="Payroll_{month}_{year}.xlsx"'
+    }
+    return StreamingResponse(stream, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
 
 # ---------------------------------------------------------------------------
 # Payroll Records endpoints
@@ -806,6 +798,71 @@ def generate_payroll(payload: dict = Body(...)):
     result = generate_monthly_payroll(month, year, location, warehouse, db)
     return result
 
+
+from bson.objectid import ObjectId
+
+@app.post("/payroll/{payroll_id}/generate_payslip")
+def generate_payslip_endpoint(payroll_id: str):
+    record = db["payroll_records"].find_one({"_id": ObjectId(payroll_id)})
+    if not record:
+        raise HTTPException(404, "Payroll record not found")
+    
+    try:
+        payslip_data = generate_and_upload_payslip(record, db)
+        return {"success": True, "payslip": payslip_data}
+    except Exception as e:
+        print(f"Error generating payslip: {e}")
+        raise HTTPException(500, f"Generation failed: {str(e)}")
+
+@app.get("/payroll/{payroll_id}/download_payslip")
+def download_payslip_endpoint(payroll_id: str):
+    record = db["payroll_records"].find_one({"_id": ObjectId(payroll_id)})
+    if not record:
+        raise HTTPException(404, "Payroll record not found")
+        
+    payslip = record.get("payslip")
+    if not payslip or not payslip.get("s3_key"):
+        raise HTTPException(404, "Payslip PDF not generated yet")
+        
+    from s3_utils import generate_presigned_url
+    url = generate_presigned_url(payslip["s3_key"])
+    
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url)
+
+@app.post("/payroll/{payroll_id}/send_whatsapp")
+def send_whatsapp_endpoint(payroll_id: str):
+    record = db["payroll_records"].find_one({"_id": ObjectId(payroll_id)})
+    if not record:
+        raise HTTPException(404, "Payroll record not found")
+        
+    mobile = record.get("mobile_number")
+    if not mobile:
+        raise HTTPException(400, "Employee has no mobile number recorded")
+        
+    payslip = record.get("payslip")
+    if not payslip or not payslip.get("s3_key"):
+        raise HTTPException(400, "Payslip PDF not generated yet")
+        
+    # Re-generate the PDF bytes purely for the WhatsApp API payload
+    try:
+        from payslip_pdf import generate_payslip_pdf
+        pdf_bytes = generate_payslip_pdf(record, db=db)
+    except Exception as e:
+        raise HTTPException(500, f"Failed to regenerate PDF: {str(e)}")
+        
+    success = send_payslip_whatsapp(
+        phone_number=mobile,
+        emp_name=record.get("emp_name", "Employee"),
+        month=f"{record.get('month', '')}/{record.get('year', '')}",
+        pdf_bytes=pdf_bytes,
+        pdf_filename=payslip.get("file_name", "payslip.pdf")
+    )
+    
+    if success:
+        return {"success": True, "message": "WhatsApp sent successfully"}
+    else:
+        raise HTTPException(500, "WhatsApp delivery failed (check logs)")
 
 @app.get("/payroll")
 def list_payroll(month: int, year: int,
@@ -917,21 +974,7 @@ def _parse_attendance_date(key: str):
     return None
 
 
-def _calc_attendance(days: dict):
-    """Given {"2026-05-26": "P", "2026-05-27": "A", ...} return present_days, absent_days, pay_days."""
-    present = 0
-    absent = 0
-    for key, value in days.items():
-        norm = str(value or "").strip().lower()
-        if norm in PAY_STATUSES:
-            present += 1
-        elif norm == ABSENT_STATUS:
-            absent += 1
-        else:
-            dt = _parse_attendance_date(str(key))
-            if dt and dt.weekday() == 6:  # Sunday is weekoff and paid if left blank
-                present += 1
-    return present, absent, present   # pay_days == present_days
+from attendance_engine import get_payroll_dates, _calc_attendance
 
 
 def _flatten_salary_doc(doc: dict):
@@ -972,43 +1015,44 @@ def _ensure_payroll_record(emp_id: str, location: str, warehouse: str,
 @app.put("/attendance/{location}/{warehouse}/{emp_id}")
 def save_attendance(location: str, warehouse: str, emp_id: str,
                     payload: dict = Body(...)):
-    """
-    Upsert attendance for one employee.
-    payload: {month, year, days: {"1":"P", "2":"A", ...}}
-    Stores against location+warehouse+emp_id (not salary collection).
-    Salary recalc is handled in Step 5.
-    """
     month = int(payload["month"])
     year  = int(payload["year"])
-    days  = {str(k): str(v).strip().upper() for k, v in payload.get("days", {}).items()}
+    new_days = {str(k): str(v).strip().upper() for k, v in payload.get("days", {}).items()}
 
-    present_days, absent_days, pay_days = _calc_attendance(days)
+    key = {"emp_id": emp_id, "location": location, "warehouse": warehouse}
+    
+    update_dict = {f"days.{k}": v for k, v in new_days.items()}
+    update_dict["updated_at"] = datetime.utcnow()
+    
+    db[ATTENDANCE_COLL].update_one(key, {"$set": update_dict}, upsert=True)
 
-    key = {"emp_id": emp_id, "location": location,
-           "warehouse": warehouse, "month": month, "year": year}
-    db[ATTENDANCE_COLL].update_one(
-        key,
-        {"$set": {**key, "days": days,
-                  "present_days": present_days,
-                  "absent_days":  absent_days,
-                  "pay_days":     pay_days,
-                  "updated_at":   datetime.utcnow()}},
-        upsert=True
-    )
+    att_doc = db[ATTENDANCE_COLL].find_one(key)
+    full_days = att_doc.get("days", {}) if att_doc else {}
 
     payroll_doc = _ensure_payroll_record(emp_id, location, warehouse, month, year)
     if payroll_doc:
         row = _flatten_salary_doc(payroll_doc)
+        fixed_wd = row.get("FIXED - Working Days") or row.get("identity", {}).get("FIXED - Working Days")
+        try:
+            fixed_wd = float(fixed_wd)
+        except (ValueError, TypeError):
+            fixed_wd = None
+            
+        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, db=db)
+        
         row["ATTENDANCE - Present Days"] = present_days
         row["ATTENDANCE - Pay Days"] = pay_days
-
+        row["ATTENDANCE - LOP"] = lop
+        
         calculated = recalculate(row)
-
+        
         update_fields = {
             "attendance.ATTENDANCE - Present Days": present_days,
             "attendance.ATTENDANCE - Pay Days":     pay_days,
+            "attendance.ATTENDANCE - LOP":          lop,
             "ATTENDANCE - Present Days":           present_days,
             "ATTENDANCE - Pay Days":               pay_days,
+            "ATTENDANCE - LOP":                    lop,
             "updated_at": datetime.utcnow(),
         }
         for k, v in calculated.items():
@@ -1019,22 +1063,44 @@ def save_attendance(location: str, warehouse: str, emp_id: str,
         if update_fields:
             db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
 
-    # Ensure index
-    db[ATTENDANCE_COLL].create_index(
-        [("emp_id",1),("location",1),("warehouse",1),("month",1),("year",1)],
-        unique=True, background=True
-    )
-    return {"ok": True, "present_days": present_days,
-            "absent_days": absent_days, "pay_days": pay_days}
+    try:
+        db[ATTENDANCE_COLL].create_index(
+            [("emp_id",1),("location",1),("warehouse",1)],
+            unique=True, background=True
+        )
+    except Exception as e:
+        print(f"Warning: could not create unique index on _attendance: {e}")
+    return {"ok": True}
+
+
+@app.delete("/employee/{location}/{warehouse}/{emp_id}")
+def delete_employee(location: str, warehouse: str, emp_id: str, scope: str = "all", month: int = None, year: int = None):
+    if scope == "all":
+        db["employee_master"].delete_one({"emp_id": emp_id, "location": location, "warehouse": warehouse})
+        db[ATTENDANCE_COLL].delete_many({"emp_id": emp_id, "location": location, "warehouse": warehouse})
+        db["payroll_records"].delete_many({"emp_id": emp_id, "location": location, "warehouse": warehouse})
+        
+        # Also clean up any dynamic manual collections
+        for coll in db.list_collection_names():
+            if not coll.startswith("_") and coll not in {"employee_master", "payroll_records", "system.indexes"}:
+                db[coll].delete_many({"emp_id": emp_id, "location": location, "warehouse": warehouse})
+    elif scope == "month":
+        if not month or not year:
+            raise HTTPException(400, "Month and year required for scope=month")
+        
+        db["payroll_records"].delete_many({"emp_id": emp_id, "location": location, "warehouse": warehouse, "month": month, "year": year})
+        
+        period_dates = get_payroll_dates(month, year)
+        unset_dict = {f"days.{d}": "" for d in period_dates}
+        db[ATTENDANCE_COLL].update_one(
+            {"emp_id": emp_id, "location": location, "warehouse": warehouse},
+            {"$unset": unset_dict}
+        )
+    return {"ok": True, "deleted": emp_id, "scope": scope}
 
 
 @app.get("/attendance/employees")
 def get_attendance_employees(location: str, warehouse: str, month: int, year: int):
-    """
-    Return employee list for attendance entry from employee_master,
-    merged with any existing attendance records for that month/year.
-    Driven entirely by employee_master — no salary collection needed.
-    """
     query = {"status": "active", "location": location, "warehouse": warehouse}
     masters = list(db["employee_master"].find(query, {"_id": 0}).sort("emp_id", 1))
 
@@ -1042,19 +1108,36 @@ def get_attendance_employees(location: str, warehouse: str, month: int, year: in
     for emp in masters:
         emp_id = emp["emp_id"]
         att = db[ATTENDANCE_COLL].find_one(
-            {"emp_id": emp_id, "month": month, "year": year,
-             "location": location, "warehouse": warehouse},
+            {"emp_id": emp_id, "location": location, "warehouse": warehouse},
             {"_id": 0}
         )
+        
+        full_days = att.get("days", {}) if att else {}
+        
+        fixed_wd = emp.get("FIXED - Working Days")
+        try:
+            fixed_wd = float(fixed_wd)
+        except (ValueError, TypeError):
+            fixed_wd = None
+            
+        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, db=db)
+        
         employees.append({
             "emp_id":       emp_id,
             "emp_name":     emp.get("emp_name", ""),
-            "days":         att["days"]         if att else {},
-            "present_days": att["present_days"] if att else 0,
-            "absent_days":  att["absent_days"]  if att else 0,
-            "pay_days":     att["pay_days"]     if att else 0,
+            "department":   emp.get("Department", ""),
+            "designation":  emp.get("Designation", ""),
+            "doj":          emp.get("DOJ", ""),
+            "days":         full_days,
+            "present_days": present_days,
+            "absent_days":  absent_days,
+            "pay_days":     pay_days,
+            "lop":          lop,
+            "working_days": wd
         })
-    return {"employees": employees}
+    cfg = get_config()
+    policy = cfg.get("attendance_policy", {})
+    return {"employees": employees, "policy": policy}
 
 
 # ---------------------------------------------------------------------------
@@ -1066,3 +1149,122 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
+
+from fastapi.responses import RedirectResponse
+import zipfile
+import io
+import time
+
+@app.get("/payroll/{row_id}/download_payslip")
+def download_payslip_endpoint(row_id: str):
+    print(f"HITTING DOWNLOAD ENDPOINT FOR {row_id}")
+    try:
+        obj_id = ObjectId(row_id)
+    except Exception as e:
+        print("ObjectId parse failed")
+        raise HTTPException(400, "Invalid row_id format")
+        
+    record = db["payroll_records"].find_one({"_id": obj_id})
+    if not record:
+        print("Record not found in DB")
+        raise HTTPException(404, "Payroll record not found")
+        
+    payslip = record.get("payslip", {})
+    if not payslip.get("s3_key"):
+        print("Payslip s3_key not found in record")
+        raise HTTPException(404, "Payslip not generated yet")
+    
+    from s3_utils import generate_presigned_url
+    signed_url = generate_presigned_url(record["payslip"]["s3_key"])
+    return RedirectResponse(signed_url)
+
+@app.post("/payroll/generate_all")
+def generate_all_payslips(payload: dict = Body(...)):
+    month = payload.get("month")
+    year = payload.get("year")
+    location = payload.get("location")
+    warehouse = payload.get("warehouse")
+    if not month or not year:
+        raise HTTPException(400, "Month and year required")
+    
+    query = {"month": int(month), "year": int(year)}
+    if location: query["location"] = location
+    if warehouse: query["warehouse"] = warehouse
+        
+    records = list(db["payroll_records"].find(query))
+    if not records:
+        return {"status": "success", "generated": 0}
+        
+    from payslip_pdf import generate_and_upload_payslip
+    generated = 0
+    for record in records:
+        try:
+            generate_and_upload_payslip(record, db)
+            generated += 1
+        except Exception as e:
+            print(f"Error generating for {record.get('emp_id')}: {e}")
+            
+    return {"status": "success", "generated": generated}
+
+@app.get("/payroll/download_all")
+def download_all_payslips(month: int, year: int, location: str = None, warehouse: str = None):
+    query = {"month": month, "year": year}
+    if location: query["location"] = location
+    if warehouse: query["warehouse"] = warehouse
+        
+    records = list(db["payroll_records"].find(query))
+    
+    zip_buffer = io.BytesIO()
+    from s3_utils import s3, S3_BUCKET
+    
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for r in records:
+            if r.get("payslip", {}).get("s3_key"):
+                try:
+                    obj = s3.get_object(Bucket=S3_BUCKET, Key=r["payslip"]["s3_key"])
+                    pdf_bytes = obj["Body"].read()
+                    filename = r["payslip"].get("file_name", f"{r.get('emp_id', 'payslip')}.pdf")
+                    zip_file.writestr(filename, pdf_bytes)
+                except Exception as e:
+                    print(f"Failed to fetch {r['payslip']['s3_key']}: {e}")
+                    
+    zip_buffer.seek(0)
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=payslips_{month}_{year}.zip"}
+    )
+
+@app.post("/payroll/send_whatsapp_all")
+def send_whatsapp_all(payload: dict = Body(...)):
+    month = payload.get("month")
+    year = payload.get("year")
+    location = payload.get("location")
+    warehouse = payload.get("warehouse")
+    if not month or not year:
+        raise HTTPException(400, "Month and year required")
+        
+    query = {"month": int(month), "year": int(year)}
+    if location: query["location"] = location
+    if warehouse: query["warehouse"] = warehouse
+        
+    records = list(db["payroll_records"].find(query))
+    from app import send_whatsapp_endpoint
+    sent = 0
+    failed = 0
+    for record in records:
+        if str(record["_id"]):
+            mob = record.get("mobile_number") or record.get("identity", {}).get("Mobile Number")
+            if mob and record.get("payslip", {}).get("s3_key"):
+                try:
+                    res = send_whatsapp_endpoint(str(record["_id"]))
+                    if res.get("status") == "success":
+                        sent += 1
+                    else:
+                        failed += 1
+                except:
+                    failed += 1
+                time.sleep(0.5)
+                
+    return {"status": "success", "sent": sent, "failed": failed}

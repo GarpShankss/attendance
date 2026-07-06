@@ -47,7 +47,6 @@ COLUMN_MAP = {
     "fixed_service_charge":   "CONTRIBUTION - Service Charge",
     "fixed_tshirt":           "CONTRIBUTION - T Shirt",
     "fixed_shoes":            "CONTRIBUTION - Shoes",
-    "ctc":                    "CONTRIBUTION - CTC",
     "total_ctc":              "CONTRIBUTION - Total CTC",
     "gst":                    "CONTRIBUTION - GST @18%",
     "billing":                "CONTRIBUTION - Total Billing",
@@ -365,7 +364,6 @@ def recalculate(row: dict) -> dict:
     put(r, "net_pay",         net_pay)
     put(r, "emp_pf",          emp_pf)
     put(r, "emp_esi",         emp_esi)
-    put(r, "ctc",             ctc)
     put(r, "total_ctc",       total_ctc)
 
     r["__calc_log__"] = log
@@ -378,7 +376,6 @@ def recalculate(row: dict) -> dict:
 if __name__ == "__main__":
     test_row = {
         "FIXED - Working Days":           30,
-        "ATTENDANCE - Present Days":      28,
         "ATTENDANCE - Pay Days":          28,
         "FIXED - Basic":                  13354,
         "FIXED - DA":                     4549,
