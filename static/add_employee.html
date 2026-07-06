@@ -1,0 +1,398 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Add Employee</title>
+<style>
+  * { box-sizing: border-box; transition: all 0.2s ease; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+    color: #f3f4f6;
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .container { width: 100%; max-width: 820px; }
+  nav {
+    background: rgba(31, 41, 55, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 20px;
+    width: 100%;
+  }
+  nav a {
+    color: #9ca3af;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  nav a:hover {
+    color: #60a5fa;
+    text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+  }
+  h2 {
+    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 28px;
+    width: 100%;
+  }
+
+  .card {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+  .card h3 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 16px;
+    color: #9ca3af;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 8px;
+  }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+  .form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; font-weight: 600; color: #9ca3af; }
+  .field input, .field select {
+    padding: 8px 12px; font-size: 13px;
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f3f4f6;
+    border-radius: 8px;
+    outline: none;
+  }
+  .field input:focus, .field select:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  }
+  .field input.error, .field select.error { border-color: #ef4444; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2); }
+
+  .btn-save {
+    background: linear-gradient(135deg, #059669, #047857);
+    color: #fff; border: none; border-radius: 8px;
+    padding: 10px 32px; font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+  }
+  .btn-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35);
+  }
+  .btn-reset {
+    background: #374151; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;
+    padding: 10px 24px; font-size: 14px; color: #d1d5db; cursor: pointer; margin-left: 12px;
+  }
+  .btn-reset:hover {
+    background: #4b5563;
+  }
+
+  #statusMsg { font-size: 14px; margin-top: 16px; min-height: 20px; font-weight: 500; }
+  .success { color: #34d399; }
+  .error-msg { color: #f87171; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<nav>
+  <a href="/" style="color: #9ca3af;">&#127968; Salary Sheet</a>
+  <a href="/attendance.html" style="color: #9ca3af;">&#128197; Attendance</a>
+  <a href="/add_employee.html" style="color:#60a5fa; text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); font-weight: 600;">&#10133; Add Employee</a>
+</nav>
+
+<h2>&#10133; Add New Employee</h2>
+
+<!-- Section 1: Employee Info -->
+<div class="card">
+  <h3>Employee Information</h3>
+  <div class="form-grid">
+    <div class="field">
+      <label>Employee ID *</label>
+      <input type="text" id="emp_id" placeholder="e.g. RSMAB0010">
+    </div>
+    <div class="field">
+      <label>Employee Name *</label>
+      <input type="text" id="emp_name" placeholder="Full name">
+    </div>
+    <div class="field">
+      <label>Location *</label>
+      <select id="location"><option value="">Select location</option></select>
+    </div>
+    <div class="field">
+      <label>Warehouse *</label>
+      <select id="warehouse"><option value="">Select warehouse</option></select>
+    </div>
+    <div class="field">
+      <label>Department</label>
+      <input type="text" id="department" placeholder="e.g. Operations">
+    </div>
+    <div class="field">
+      <label>Designation</label>
+      <input type="text" id="designation" placeholder="e.g. Helper">
+    </div>
+    <div class="field">
+      <label>Date of Joining</label>
+      <input type="date" id="doj">
+    </div>
+    <div class="field">
+      <label>Active Status</label>
+      <select id="active_status">
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Phone Number</label>
+      <input type="text" id="phone_number" placeholder="e.g. 9876543210">
+    </div>
+    <div class="field">
+      <label>WC NO</label>
+      <input type="text" id="wc_no" placeholder="e.g. WC-999">
+    </div>
+  </div>
+</div>
+
+<!-- Section 2: Joining Month -->
+<div class="card">
+  <h3>Joining Month (employee appears in payroll from this month onward)</h3>
+  <div class="form-grid">
+    <div class="field">
+      <label>Joining Month *</label>
+      <select id="joined_month"></select>
+    </div>
+    <div class="field">
+      <label>Joining Year *</label>
+      <select id="joined_year"></select>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3: Salary Master -->
+<div class="card">
+  <h3>Salary Components (Fixed)</h3>
+  <div class="form-grid three">
+    <div class="field">
+      <label>Working Days</label>
+      <input type="number" id="working_days" placeholder="26" value="26">
+    </div>
+    <div class="field">
+      <label>Basic</label>
+      <input type="number" id="fixed_basic" placeholder="0">
+    </div>
+    <div class="field">
+      <label>DA</label>
+      <input type="number" id="fixed_da" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Other Allowances</label>
+      <input type="number" id="fixed_other" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Leave With Wages</label>
+      <input type="number" id="fixed_leave" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Bonus @8.33%</label>
+      <input type="number" id="fixed_bonus" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Service Charge</label>
+      <input type="number" id="service_charge" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Uniform Charges</label>
+      <input type="number" id="uniform" placeholder="0">
+    </div>
+    <div class="field">
+      <label>UAN</label>
+      <input type="text" id="uan" placeholder="UAN number">
+    </div>
+    <div class="field">
+      <label>ESIC</label>
+      <input type="text" id="esic" placeholder="ESIC number">
+    </div>
+    <div class="field">
+      <label>Bank Account</label>
+      <input type="text" id="account" placeholder="Account number">
+    </div>
+    <div class="field">
+      <label>IFSC</label>
+      <input type="text" id="ifsc" placeholder="IFSC code">
+    </div>
+    <div class="field">
+      <label>T Shirt</label>
+      <input type="number" id="tshirt" placeholder="0" value="0">
+    </div>
+    <div class="field">
+      <label>Shoes</label>
+      <input type="number" id="shoes" placeholder="0" value="0">
+    </div>
+    <div class="field">
+      <label>Advance</label>
+      <input type="number" id="advance" placeholder="0" value="0">
+    </div>
+  </div>
+</div>
+
+<div>
+  <button class="btn-save" onclick="saveEmployee()">&#128190; Save Employee</button>
+  <button class="btn-reset" onclick="resetForm()">Reset</button>
+</div>
+<div id="statusMsg"></div>
+
+<script>
+const MONTH_NAMES = ["","January","February","March","April","May","June",
+                     "July","August","September","October","November","December"];
+let WAREHOUSES = {};
+
+async function boot() {
+  const res = await fetch('/warehouses');
+  WAREHOUSES = await res.json();
+
+  const locSel = document.getElementById('location');
+  Object.keys(WAREHOUSES).forEach(l => {
+    locSel.innerHTML += `<option value="${l}">${l}</option>`;
+  });
+  locSel.addEventListener('change', populateWarehouse);
+
+  // Month/Year selects
+  const mSel = document.getElementById('joined_month');
+  const ySel = document.getElementById('joined_year');
+  const now  = new Date();
+
+  for (let m = 1; m <= 12; m++) {
+    mSel.innerHTML += `<option value="${m}"${m === now.getMonth()+1 ? ' selected':''}>${MONTH_NAMES[m]}</option>`;
+  }
+  for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 1; y++) {
+    ySel.innerHTML += `<option value="${y}"${y === now.getFullYear() ? ' selected':''}>${y}</option>`;
+  }
+}
+
+function populateWarehouse() {
+  const loc  = document.getElementById('location').value;
+  const whs  = WAREHOUSES[loc] || [];
+  const wSel = document.getElementById('warehouse');
+  wSel.innerHTML = '<option value="">Select warehouse</option>' +
+    whs.map(w => `<option value="${w}">${w}</option>`).join('');
+}
+
+function n(id) {
+  const v = document.getElementById(id).value;
+  return v === '' ? 0 : parseFloat(v) || 0;
+}
+function s(id) { return document.getElementById(id).value.trim(); }
+
+async function saveEmployee() {
+  const statusEl = document.getElementById('statusMsg');
+  statusEl.className = '';
+  statusEl.textContent = '';
+
+  // Validate required fields
+  const required = ['emp_id','emp_name','location','warehouse'];
+  let valid = true;
+  required.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el.value.trim()) {
+      el.classList.add('error');
+      valid = false;
+    } else {
+      el.classList.remove('error');
+    }
+  });
+  if (!valid) {
+    statusEl.className = 'error-msg';
+    statusEl.textContent = 'Please fill in all required fields (marked with *).';
+    return;
+  }
+
+  const payload = {
+    emp_id:        s('emp_id'),
+    emp_name:      s('emp_name'),
+    location:      s('location'),
+    warehouse:     s('warehouse'),
+    joined_month:  parseInt(s('joined_month')),
+    joined_year:   parseInt(s('joined_year')),
+    salary: {
+      "FIXED - Working Days":           n('working_days'),
+      "FIXED - Basic":                  n('fixed_basic'),
+      "FIXED - DA":                     n('fixed_da'),
+      "FIXED - Other Allows":           n('fixed_other'),
+      "FIXED - Leave With wages":       n('fixed_leave'),
+      "FIXED - Bonus @8.33%":           n('fixed_bonus'),
+      "CONTRIBUTION - Service Charge":  n('service_charge'),
+      "CONTRIBUTION - Uniform Charges": n('uniform'),
+      "CONTRIBUTION - T Shirt":         n('tshirt'),
+      "CONTRIBUTION - Shoes":           n('shoes'),
+      "Deductions - Adv":               n('advance'),
+    },
+    identity: {
+      "Employee Name":  s('emp_name'),
+      "Department":     s('department'),
+      "Designation":    s('designation'),
+      "DOJ":            s('doj'),
+      "Active Status":  s('active_status'),
+      "UAN":            s('uan'),
+      "ESIC":           s('esic'),
+      "ACCOUNT":        s('account'),
+      "IFSC":           s('ifsc'),
+      "Phone Number":   s('phone_number'),
+      "WC NO":          s('wc_no'),
+    },
+  };
+
+  statusEl.className = '';
+  statusEl.textContent = 'Saving...';
+
+  try {
+    const res = await fetch('/employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
+
+    statusEl.className = 'success';
+    statusEl.textContent = `Employee ${payload.emp_id} saved successfully ✓  — they will appear in payroll from ${MONTH_NAMES[payload.joined_month]} ${payload.joined_year} onward.`;
+    resetForm();
+  } catch (e) {
+    statusEl.className = 'error-msg';
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+}
+
+function resetForm() {
+  ['emp_id','emp_name','department','designation','doj','uan','esic','account','ifsc','phone_number','wc_no']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  ['fixed_basic','fixed_da','fixed_other','fixed_leave','fixed_bonus','service_charge','uniform','tshirt','shoes','advance']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('working_days').value = '26';
+  document.getElementById('location').value = '';
+  document.getElementById('warehouse').innerHTML = '<option value="">Select warehouse</option>';
+  document.getElementById('active_status').value = 'Active';
+}
+
+boot();
+</script>
+</div>
+</body>
+</html>

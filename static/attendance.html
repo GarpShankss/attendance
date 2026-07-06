@@ -1,0 +1,390 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Attendance Module</title>
+<style>
+  * { box-sizing: border-box; transition: all 0.2s ease; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+    color: #f3f4f6;
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h2 {
+    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 4px;
+  }
+  nav {
+    background: rgba(31, 41, 55, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 20px;
+  }
+  nav a {
+    color: #9ca3af;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  nav a:hover {
+    color: #60a5fa;
+    text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+  }
+  section {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+  section h3 { margin-top: 0; color: #9ca3af; font-size: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
+  .filter-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .filter-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9ca3af; }
+  
+  select, input, button {
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f3f4f6;
+    padding: 6px 12px;
+    border-radius: 8px;
+    outline: none;
+    font-size: 13px;
+  }
+  select:focus, input:focus {
+    border-color: #60a5fa;
+  }
+  
+  .att-wrap { overflow-x: auto; margin-top: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
+  table.att { border-collapse: collapse; font-size: 12px; min-width: 100%; background: rgba(31, 41, 55, 0.3); }
+  table.att th, table.att td { border: 1px solid rgba(255,255,255,0.05); padding: 6px 8px; white-space: nowrap; text-align: center; }
+  table.att th { background: #0f172a; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  table.att td.emp-info { text-align: left; background: #0f172a; color: #f3f4f6; position: sticky; left: 0; z-index: 1; min-width: 130px; border-right: 2px solid rgba(255,255,255,0.15); }
+  table.att td.summary { background: rgba(59, 130, 246, 0.1); color: #60a5fa; font-weight: 600; }
+  table.att td.summary.absent { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+
+  table.att input.day-inp {
+    width: 34px; text-align: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
+    padding: 4px; font-size: 11px; text-transform: uppercase; color: #000; font-weight: bold;
+  }
+  table.att input.day-inp.status-p  { background: #a7f3d0; color: #065f46; }
+  table.att input.day-inp.status-sl { background: #fde68a; color: #92400e; }
+  table.att input.day-inp.status-pl { background: #fbcfe8; color: #9d174d; }
+  table.att input.day-inp.status-hp { background: #bfdbfe; color: #1e40af; }
+  table.att input.day-inp.status-a  { background: #fca5a5; color: #991b1b; }
+  table.att input.day-inp.status-blank { background: rgba(17, 24, 39, 0.8); color: #f3f4f6; }
+
+  th.weekend { background: rgba(59, 130, 246, 0.15); }
+  td.weekend input { background: rgba(59, 130, 246, 0.08) !important; color: #f3f4f6; }
+
+  .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; }
+  .btn-save-all { background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 600; }
+  .btn-att-delete { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+  .btn-att-delete:hover { background: #ef4444; color: white; }
+  
+  #attStatus { font-size: 13px; margin-left: 12px; color: #34d399; }
+  .legend { font-size: 12px; color: #9ca3af; margin-top: 8px; }
+  .legend span { display: inline-block; margin-right: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+  .leg-p  { background: #a7f3d0; color: #065f46; }
+  .leg-sl { background: #fde68a; color: #92400e; }
+  .leg-pl { background: #fbcfe8; color: #9d174d; }
+  .leg-hp { background: #bfdbfe; color: #1e40af; }
+  .leg-a  { background: #fca5a5; color: #991b1b; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" style="color: #9ca3af;">&#127968; Salary Sheet</a>
+  <a href="/attendance.html" style="color:#60a5fa; text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); font-weight: 600;">&#128197; Attendance</a>
+  <a href="/add_employee.html" style="color: #9ca3af;">&#10133; Add Employee</a>
+</nav>
+
+<h2>&#128197; Attendance Module</h2>
+
+<section>
+  <h3>Filters</h3>
+  <div class="filter-row">
+    <label>Location:
+      <select id="attLocation" style="min-width:140px;"><option value="">Select</option></select>
+    </label>
+    <label>Warehouse:
+      <select id="attWarehouse" style="min-width:140px;"><option value="">Select</option></select>
+    </label>
+    <label>Month:
+      <select id="attMonth" style="min-width:120px;"></select>
+    </label>
+    <label>Year:
+      <select id="attYear" style="min-width:90px;"></select>
+    </label>
+    <button class="btn-primary" onclick="loadAttendance()">Load Employees</button>
+    <button id="downloadAttendanceBtn" style="margin-left:8px; background:#e65100; color:#fff; border:none; border-radius:4px; padding:5px 14px; cursor:pointer;" onclick="downloadAttendanceExcel()">Download Attendance (Excel)</button>
+  </div>
+  <div class="legend" style="margin-top:10px;">
+    <span class="leg-p">P = Present</span>
+    <span class="leg-sl">SL = Sick Leave</span>
+    <span class="leg-pl">PL = Paid Leave</span>
+    <span class="leg-hp">HP = Holiday Present</span>
+    <span class="leg-a">A = Absent</span>
+    <em style="font-size:12px;">P, SL, PL, HP count as paid days; blank Sunday is paid weekoff.</em>
+  </div>
+</section>
+
+<section id="attSection" style="display:none;">
+  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
+    <h3 style="margin:0;" id="attTitle">Attendance</h3>
+    <button class="btn-save-all" onclick="saveAllAttendance()">&#128190; Save All</button>
+    <span id="attStatus"></span>
+  </div>
+  <div class="att-wrap">
+    <table class="att" id="attTable"></table>
+  </div>
+</section>
+
+<script>
+const MONTH_NAMES = ["","January","February","March","April","May","June",
+                     "July","August","September","October","November","December"];
+const PAY_STATUSES = new Set(["p","sl","pl","hp"]);
+
+let WAREHOUSES = {};
+let currentLocation = "", currentWarehouse = "";
+let currentMonth = 0, currentYear = 0;
+let currentPeriodDates = [];
+
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"]/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+}
+
+async function boot() {
+  const res = await fetch('/warehouses');
+  WAREHOUSES = await res.json();
+
+  const locSel = document.getElementById('attLocation');
+  locSel.innerHTML = '<option value="">Select location</option>' +
+    Object.keys(WAREHOUSES).map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+  locSel.addEventListener('change', () => {
+    populateWarehouse();
+  });
+
+  populateMonthYear();
+}
+
+function populateWarehouse() {
+  const loc = document.getElementById('attLocation').value;
+  const whs = WAREHOUSES[loc] || [];
+  document.getElementById('attWarehouse').innerHTML =
+    '<option value="">Select warehouse</option>' +
+    whs.map(w => `<option value="${esc(w)}">${esc(w)}</option>`).join('');
+}
+
+function populateMonthYear() {
+  const now  = new Date();
+  const mSel = document.getElementById('attMonth');
+  const ySel = document.getElementById('attYear');
+  mSel.innerHTML = Array.from({length:12}, (_,i) =>
+    `<option value="${i+1}"${i+1===now.getMonth()+1?' selected':''}>${MONTH_NAMES[i+1]}</option>`
+  ).join('');
+  const years = [now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1];
+  ySel.innerHTML = years.map(y =>
+    `<option value="${y}"${y===now.getFullYear()?' selected':''}>${y}</option>`
+  ).join('');
+}
+
+function getPayrollPeriodDates(month, year) {
+  const start = new Date(year, month - 2, 26);
+  const end = new Date(year, month - 1, 25);
+  const dates = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    dates.push(new Date(d));
+  }
+  return dates;
+}
+
+async function loadAttendance() {
+  currentLocation  = document.getElementById('attLocation').value;
+  currentWarehouse = document.getElementById('attWarehouse').value;
+  currentMonth     = parseInt(document.getElementById('attMonth').value);
+  currentYear      = parseInt(document.getElementById('attYear').value);
+
+  if (!currentLocation || !currentWarehouse) {
+    alert('Please select both Location and Warehouse.');
+    return;
+  }
+
+  const params = new URLSearchParams({
+    location: currentLocation, warehouse: currentWarehouse,
+    month: currentMonth, year: currentYear,
+  });
+
+  const res  = await fetch('/attendance/employees?' + params.toString());
+  if (!res.ok) { alert('Failed to load employees: ' + await res.text()); return; }
+  const data = await res.json();
+
+  currentPeriodDates = getPayrollPeriodDates(currentMonth, currentYear);
+  document.getElementById('attTitle').textContent =
+    `${MONTH_NAMES[currentMonth]} ${currentYear} (26th-to-25th period) — ${currentLocation} / ${currentWarehouse}`;
+  document.getElementById('attSection').style.display = '';
+  renderTable(data.employees);
+}
+
+function renderTable(employees) {
+  const dates = currentPeriodDates;
+  const DAY_ABBR = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  let head = '<thead><tr>'
+    + '<th style="min-width:70px;">Action</th>'
+    + '<th style="min-width:90px;">ID</th>'
+    + '<th style="min-width:140px;">Name</th>';
+  for (const date of dates) {
+    const dow  = date.getDay();
+    const wknd = dow === 0 ? ' class="weekend"' : '';
+    head += `<th${wknd}>${date.getDate()}<br><small>${MONTH_NAMES[date.getMonth() + 1]}</small></th>`;
+  }
+  head += '<th>Present</th><th class="absent">Absent</th><th>Pay Days</th></tr></thead>';
+
+  let body = '<tbody>';
+  for (const emp of employees) {
+    body += `<tr data-emp-id="${esc(emp.emp_id)}">`;
+    body += `<td><button class="btn-att-delete" onclick="deleteAttendanceEmployee('${esc(emp.emp_id)}')">Delete</button></td>`;
+    body += `<td class="emp-info">${esc(emp.emp_id)}</td>`;
+    body += `<td class="emp-info">${esc(emp.emp_name)}</td>`;
+    for (const date of dates) {
+      const key = date.toISOString().slice(0, 10);
+      const fallback = emp.days[String(date.getDate())];
+      const val = ((emp.days[key] !== undefined ? emp.days[key] : fallback) || '').toString().toUpperCase();
+      const dow  = date.getDay();
+      const wknd = dow === 0 ? ' weekend' : '';
+      const cls = val === 'P' ? 'status-p' : val === 'SL' ? 'status-sl' : val === 'PL' ? 'status-pl' : val === 'HP' ? 'status-hp' : val === 'A' ? 'status-a' : 'status-blank';
+      body += `<td class="${wknd}"><input class="day-inp ${cls}" type="text" maxlength="2"`
+            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)"></td>`;
+    }
+    body += `<td class="summary" data-type="present">${emp.present_days||0}</td>`;
+    body += `<td class="summary absent" data-type="absent">${emp.absent_days||0}</td>`;
+    body += `<td class="summary" data-type="pay">${emp.pay_days||0}</td>`;
+    body += '</tr>';
+  }
+  body += '</tbody>';
+  document.getElementById('attTable').innerHTML = head + body;
+}
+
+function onDayInput(inp) {
+  const val = inp.value.trim().toUpperCase();
+  inp.value = val;
+  inp.className = 'day-inp '
+    + (val==='P'?'status-p':val==='SL'?'status-sl':val==='PL'?'status-pl':val==='HP'?'status-hp':val==='A'?'status-a':'status-blank');
+  // live summary
+  const tr = inp.closest('tr');
+  let present = 0, absent = 0;
+  tr.querySelectorAll('input.day-inp').forEach(i => {
+    const v = i.value.trim().toLowerCase();
+    if (PAY_STATUSES.has(v)) present++;
+    else if (v === 'a') absent++;
+  });
+  tr.querySelector('[data-type="present"]').textContent = present;
+  tr.querySelector('[data-type="absent"]').textContent  = absent;
+  tr.querySelector('[data-type="pay"]').textContent     = present;
+}
+
+async function saveAllAttendance() {
+  const statusEl = document.getElementById('attStatus');
+  statusEl.style.color = 'green';
+  statusEl.textContent = 'Saving...';
+
+  const rows = document.querySelectorAll('#attTable tbody tr');
+  let saved = 0, failed = 0;
+
+  for (const tr of rows) {
+    const empId = tr.dataset.empId;
+    const days  = {};
+    tr.querySelectorAll('input.day-inp').forEach(inp => {
+      days[inp.dataset.day] = inp.value.trim().toUpperCase();
+    });
+
+    try {
+      const res = await fetch(
+        `/attendance/${encodeURIComponent(currentLocation)}`
+        + `/${encodeURIComponent(currentWarehouse)}`
+        + `/${encodeURIComponent(empId)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ month: currentMonth, year: currentYear, days }),
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      saved++;
+    } catch (e) {
+      console.error('Failed for', empId, e);
+      failed++;
+    }
+  }
+
+  if (failed === 0) {
+    statusEl.textContent = `Saved ${saved} employee(s) \u2713`;
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } else {
+    statusEl.style.color = 'red';
+    statusEl.textContent = `${saved} saved, ${failed} failed`;
+  }
+}
+
+async function deleteAttendanceEmployee(empId) {
+  if (!confirm(`Delete attendance and payroll for ${empId} from ${currentLocation}/${currentWarehouse}?`)) {
+    return;
+  }
+  const statusEl = document.getElementById('attStatus');
+  statusEl.style.color = 'green';
+  statusEl.textContent = 'Deleting...';
+  try {
+    const res = await fetch(
+      `/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(empId)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    statusEl.textContent = `Deleted ${empId} ✓`;
+    loadAttendance();
+  } catch (err) {
+    statusEl.style.color = 'red';
+    statusEl.textContent = 'Delete failed: ' + err.message;
+  }
+}
+
+async function downloadAttendanceExcel() {
+  const loc = document.getElementById('attLocation').value;
+  const wh = document.getElementById('attWarehouse').value;
+  const month = document.getElementById('attMonth').value;
+  const year = document.getElementById('attYear').value;
+
+  if (!loc || !wh) {
+    alert('Please select both Location and Warehouse first.');
+    return;
+  }
+
+  const params = new URLSearchParams({
+    location: loc,
+    warehouse: wh,
+    month: month,
+    year: year
+  });
+  window.open('/attendance/download?' + params.toString(), '_blank');
+}
+
+boot();
+</script>
+</body>
+</html>

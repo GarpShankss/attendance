@@ -1,0 +1,10 @@
+{
+  "employee_pf_percent": 12,
+  "employer_pf_percent": 13,
+  "employee_esi_percent": 0.75,
+  "employer_esi_percent": 3.25,
+  "pf_wage_ceiling": 15000,
+  "esi_eligibility_ceiling": 21001,
+  "professional_tax_amount": 200,
+  "professional_tax_threshold": 25000
+}

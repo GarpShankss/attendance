@@ -1,0 +1,852 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Payroll Data Editor</title>
+<style>
+  * { box-sizing: border-box; transition: all 0.2s ease; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
+    color: #f3f4f6;
+    margin: 0;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h2 {
+    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 4px;
+  }
+  nav {
+    background: rgba(31, 41, 55, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    gap: 20px;
+  }
+  nav a {
+    color: #9ca3af;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  nav a:hover {
+    color: #60a5fa;
+    text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+  }
+
+  section {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+  section h3 { margin-top: 0; color: #9ca3af; font-size: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
+
+  /* Tables */
+  table { border-collapse: collapse; margin-top: 10px; font-size: 12px; width: 100%; background: rgba(31, 41, 55, 0.3); border-radius: 12px; overflow: hidden; }
+  th, td { border: 1px solid rgba(255,255,255,0.05); padding: 8px 12px; white-space: nowrap; text-align: left; }
+  th { background: #0f172a; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.05em; position: sticky; top: 0; z-index: 1; }
+  td.meta { background: rgba(17, 24, 39, 0.5); color: #9ca3af; font-style: italic; }
+  .table-wrap { max-height: 65vh; overflow: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; margin-top: 10px; background: #0f172a; }
+
+  /* Inline edit inputs */
+  td input.cell-input { width: 100%; border: 1px solid #3b82f6; border-radius: 4px;
+    padding: 4px 8px; font-size: 12px; background: rgba(15, 23, 42, 0.9); color: #f8fafc; }
+
+  /* Buttons */
+  select, input[type="text"], input[type="number"], button {
+    background: rgba(17, 24, 39, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f3f4f6;
+    padding: 6px 12px;
+    border-radius: 6px;
+    outline: none;
+    font-size: 13px;
+  }
+  select:focus, input:focus {
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+  }
+  select option {
+    background-color: #111827;
+    color: #f3f4f6;
+  }
+  label {
+    font-size: 13px;
+    color: #9ca3af;
+  }
+  label strong {
+    color: #f3f4f6;
+  }
+  button {
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+  }
+  button:hover {
+    transform: translateY(-1px);
+  }
+  
+  .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; }
+  .btn-edit { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); }
+  .btn-edit:hover { background: #2563eb; color: white; }
+  .btn-save { background: linear-gradient(135deg, #059669, #047857); color: #fff; }
+  .btn-cancel { background: #374151; color: #d1d5db; border: 1px solid rgba(255,255,255,0.05); }
+  
+  .status { margin-left: 10px; color: #34d399; font-size: 13px; font-weight: 500; }
+
+  /* Modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+  .modal-bg.open { display: flex; }
+  .modal-box { background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px 28px;
+    width: 90%; max-width: 560px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+  .modal-box h3 { margin-top: 0; margin-bottom: 16px; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .emp-field { display: flex; flex-direction: column; margin-bottom: 12px; }
+  .emp-field label { font-size: 12px; color: #9ca3af; margin-bottom: 4px; font-weight: 600; }
+  .emp-field input { padding: 8px 12px; font-size: 13px; background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #f3f4f6; border-radius: 8px; }
+  .emp-field input:focus { border-color: #60a5fa; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+  .modal-save { background: linear-gradient(135deg, #059669, #047857); color: #fff; border: none; border-radius: 8px; padding: 8px 24px; cursor: pointer; font-size: 13px; }
+  .modal-cancel { background: #374151; border: 1px solid rgba(255,255,255,0.05); color: #d1d5db; border-radius: 8px; padding: 8px 20px; cursor: pointer; font-size: 13px; }
+  .modal-status { font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+  /* Calc log panel */
+  #calcLogPanel { display:none; position:fixed; bottom:0; right:0; width:520px;
+    max-height:45vh; background:#1e1e1e; color:#d4d4d4; font-family:monospace;
+    font-size:12px; border-top-left-radius:12px; z-index:200; border: 1px solid rgba(255,255,255,0.08);
+    box-shadow:0 -5px 25px rgba(0,0,0,0.5); flex-direction:column; }
+  #calcLogPanel.open { display:flex; }
+  #calcLogHeader { background:#2d2d2d; padding:8px 16px; display:flex;
+    justify-content:space-between; align-items:center; cursor:pointer;
+    border-top-left-radius:12px; flex-shrink:0; }
+  #calcLogHeader span { color:#fff; font-weight:600; font-size:13px; }
+  #calcLogHeader button { background:none; border:none; color:#aaa;
+    font-size:16px; cursor:pointer; padding:0 4px; }
+  #calcLogBody { overflow-y:auto; padding:12px 16px; white-space:pre;
+    flex:1; line-height:1.5; }
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin-top: 10px; }
+  .settings-grid label { display: flex; flex-direction: column; font-size: 13px; gap: 4px; color: #9ca3af; }
+  .settings-grid input { padding: 8px 12px; font-size: 13px; background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #f3f4f6; border-radius: 8px; width: 100%; }
+  #settingsStatus { font-size: 13px; margin-top: 10px; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<nav style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div style="display: flex; gap: 20px;">
+    <a href="/" style="color:#60a5fa; text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); font-weight: 600;">&#127968; Salary Sheet</a>
+    <a href="/attendance.html">&#128197; Attendance</a>
+    <a href="/add_employee.html">&#10133; Add Employee</a>
+  </div>
+  <button id="toggleUploadBtn" class="btn-primary" style="padding: 8px 18px; font-size: 13px; margin: 0;">📂 Upload File</button>
+</nav>
+<h2>Payroll Data Editor</h2>
+
+<!-- Section 1: Upload -->
+<section id="uploadSection" style="display: none;">
+  <h3>1. Upload a file</h3>
+  <p style="margin-top:0;">
+    <label><strong>Location:</strong>&nbsp;
+      <select id="uploadLocation" style="min-width:140px;"></select>
+    </label>
+  </p>
+  <input type="file" id="fileInput" accept=".xlsx,.xls">
+  <button id="parseBtn">Parse File</button>
+  <span class="status" id="uploadStatus"></span>
+  <div id="assignPanel">
+    <p style="margin-bottom:6px;">Assign each sheet to a warehouse (or skip it):</p>
+    <table>
+      <thead><tr><th>Sheet</th><th>Rows</th><th>Warehouse</th></tr></thead>
+      <tbody id="sheetsBody"></tbody>
+    </table>
+    <button id="confirmBtn" style="margin-top:10px;">Confirm &amp; Load into MongoDB</button>
+  </div>
+</section>
+
+<!-- Section 2: Browse + filter -->
+<section>
+  <h3>2. Browse / filter data</h3>
+  <div class="filter-row">
+    <label>Location:
+      <select id="filterLocation" style="min-width:140px;"></select>
+    </label>
+    <label>Warehouse:
+      <select id="filterWarehouse" style="min-width:140px;"></select>
+    </label>
+    <label>Month:
+      <select id="filterMonth" style="min-width:120px;">
+        <option value="">All months</option>
+      </select>
+    </label>
+    <label>Year:
+      <select id="filterYear" style="min-width:90px;">
+        <option value="">All years</option>
+      </select>
+    </label>
+    <button id="showDataBtn">Show Data</button>
+    <button id="generatePayrollBtn" class="btn-primary" style="margin-left:8px;">Generate Payroll</button>
+    <button id="downloadPayrollBtn" style="margin-left:8px; background:#2e7d32; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Download Payroll</button>
+    <span class="status" id="generatePayrollStatus"></span>
+    <span class="status" id="dataStatus"></span>
+  </div>
+
+  <div class="table-wrap">
+    <table id="dataTable"></table>
+  </div>
+</section>
+
+<!-- Section 3: Payroll Settings -->
+<section id="settingsSection">
+  <h3 style="cursor:pointer; user-select:none;" onclick="toggleSettings()">
+    &#9881; Payroll Settings
+    <span id="settingsToggle" style="font-size:12px; color:#666; margin-left:8px;">(click to expand)</span>
+  </h3>
+  <div id="settingsBody" style="display:none;">
+    <div class="settings-grid" id="settingsGrid"></div>
+    <div style="margin-top:14px;">
+      <button onclick="saveSettings()" style="background:#2e7d32;color:#fff;border:none;border-radius:4px;padding:6px 18px;cursor:pointer;font-size:13px;">Save Settings</button>
+    </div>
+    <div id="settingsStatus"></div>
+  </div>
+</section>
+
+<!-- Calculation Log Panel -->
+<div id="calcLogPanel">
+  <div id="calcLogHeader">
+    <span>&#128196; Salary Calculation Log</span>
+    <div>
+      <button onclick="clearLog()" title="Clear">&#128465;</button>
+      <button onclick="closeLog()" title="Close">&times;</button>
+    </div>
+  </div>
+  <div id="calcLogBody"></div>
+</div>
+
+<!-- Add Employee Modal -->
+<div id="empModal" class="modal-bg">
+  <div class="modal-box">
+    <h3>Add Employee</h3>
+    <p style="margin:0 0 12px; font-size:13px; color:#555;">
+      Collection:&nbsp;
+      <select id="empCollection" style="min-width:220px;"></select>
+    </p>
+    <div id="empFormFields"></div>
+    <div class="modal-actions">
+      <button id="empSaveBtn" class="modal-save">Save</button>
+      <button id="empCancelBtn" class="modal-cancel">Cancel</button>
+    </div>
+    <div id="empFormStatus" class="modal-status"></div>
+  </div>
+</div>
+
+<script>
+const MONTH_NAMES = ["","January","February","March","April","May","June",
+                     "July","August","September","October","November","December"];
+
+const els = {
+  fileInput:       document.getElementById('fileInput'),
+  parseBtn:        document.getElementById('parseBtn'),
+  assignPanel:     document.getElementById('assignPanel'),
+  uploadLocation:  document.getElementById('uploadLocation'),
+  sheetsBody:      document.getElementById('sheetsBody'),
+  confirmBtn:      document.getElementById('confirmBtn'),
+  uploadStatus:    document.getElementById('uploadStatus'),
+  filterLocation:  document.getElementById('filterLocation'),
+  filterWarehouse: document.getElementById('filterWarehouse'),
+  filterMonth:     document.getElementById('filterMonth'),
+  filterYear:      document.getElementById('filterYear'),
+  showDataBtn:     document.getElementById('showDataBtn'),
+  generatePayrollBtn: document.getElementById('generatePayrollBtn'),
+  generatePayrollStatus: document.getElementById('generatePayrollStatus'),
+  addEmpBtn:       document.getElementById('addEmpBtn'),
+  dataTable:       document.getElementById('dataTable'),
+  dataStatus:      document.getElementById('dataStatus'),
+  empModal:        document.getElementById('empModal'),
+  empFormFields:   document.getElementById('empFormFields'),
+  empCollection:   document.getElementById('empCollection'),
+  empSaveBtn:      document.getElementById('empSaveBtn'),
+  empCancelBtn:    document.getElementById('empCancelBtn'),
+  empFormStatus:   document.getElementById('empFormStatus'),
+};
+
+// Toggle Upload Panel
+document.getElementById('toggleUploadBtn').addEventListener('click', () => {
+  const panel = document.getElementById('uploadSection');
+  if (panel.style.display === 'none' || panel.style.display === '') {
+    panel.style.display = 'block';
+  } else {
+    panel.style.display = 'none';
+  }
+});
+
+let WAREHOUSES = {};
+let pendingToken = null;
+let pendingSheets = [];
+let currentColumns = [];
+// track rows in edit mode: rowKey -> original td values
+let editingRows = {};
+
+function escapeHtml(v) {
+  return String(v ?? '').replace(/[&<>"]/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+}
+const escapeAttr = escapeHtml;
+
+// ---- Boot ----
+async function loadWarehouses() {
+  const res = await fetch('/warehouses');
+  WAREHOUSES = await res.json();
+  const locations = Object.keys(WAREHOUSES);
+  els.uploadLocation.innerHTML = locations.map(l =>
+    `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+  els.filterLocation.innerHTML = '<option value="">All locations</option>' +
+    locations.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+  populateFilterWarehouse();
+}
+
+function populateFilterWarehouse() {
+  const loc = els.filterLocation.value;
+  const whs = loc ? (WAREHOUSES[loc] || []) : [...new Set(Object.values(WAREHOUSES).flat())];
+  els.filterWarehouse.innerHTML = '<option value="">All warehouses</option>' +
+    whs.map(w => `<option value="${escapeAttr(w)}">${escapeHtml(w)}</option>`).join('');
+}
+els.filterLocation.addEventListener('change', () => {
+  populateFilterWarehouse();
+  loadMonthYearOptions();
+});
+els.filterWarehouse.addEventListener('change', loadMonthYearOptions);
+
+async function loadMonthYearOptions() {
+  const params = new URLSearchParams();
+  if (els.filterLocation.value) params.set('location', els.filterLocation.value);
+  if (els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
+
+  const now = new Date();
+  const allMonths = new Set(Array.from({length: 12}, (_, i) => i + 1));
+  const allYears = new Set([now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]);
+
+  try {
+    const res = await fetch('/data/months?' + params.toString());
+    const data = await res.json();
+    data.months.forEach(({month, year}) => {
+      allMonths.add(month);
+      allYears.add(year);
+    });
+  } catch(_) {
+    // Ignore failures; default month/year ranges are still usable.
+  }
+
+  els.filterMonth.innerHTML = '<option value="">All months</option>' +
+    [...allMonths].sort((a,b)=>a-b).map(m =>
+      `<option value="${m}">${MONTH_NAMES[m]}</option>`).join('');
+  els.filterYear.innerHTML = '<option value="">All years</option>' +
+    [...allYears].sort((a,b)=>a-b).map(y => `<option value="${y}">${y}</option>`).join('');
+}
+
+// ---- Upload parse ----
+els.parseBtn.addEventListener('click', async () => {
+  const file = els.fileInput.files[0];
+  if (!file) { els.uploadStatus.textContent = 'Choose a file first'; return; }
+  els.uploadStatus.textContent = 'Parsing...';
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/upload/preview', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    pendingToken = data.token;
+    pendingSheets = data.sheets.map(s => ({ ...s, warehouse: '' }));
+    renderSheetRows();
+    els.assignPanel.style.display = 'block';
+    els.uploadStatus.textContent = `Found ${pendingSheets.length} sheet(s) — assign warehouse below`;
+  } catch (err) {
+    els.uploadStatus.textContent = 'Parse failed: ' + err.message;
+  }
+});
+
+function renderSheetRows() {
+  const loc = els.uploadLocation.value;
+  const whs = WAREHOUSES[loc] || [];
+  els.sheetsBody.innerHTML = pendingSheets.map((s, idx) => {
+    const selected = s.warehouse || (whs.includes(s.guess) ? s.guess : '');
+    const opts = ['<option value="">-- skip --</option>']
+      .concat(whs.map(w =>
+        `<option value="${escapeAttr(w)}"${w === selected ? ' selected' : ''}>${escapeHtml(w)}</option>`))
+      .join('');
+    return `<tr>
+      <td>${escapeHtml(s.sheet_name)}</td><td>${s.rows}</td>
+      <td><select data-sheet-index="${idx}" style="min-width:160px;" onchange="window.__saveSheetWarehouse && window.__saveSheetWarehouse(${idx}, this.value)">${opts}</select></td>
+    </tr>`;
+  }).join('');
+}
+els.uploadLocation.addEventListener('change', () => {
+  pendingSheets = pendingSheets.map(s => ({ ...s, warehouse: '' }));
+  renderSheetRows();
+});
+
+window.__saveSheetWarehouse = (idx, value) => {
+  if (pendingSheets[idx]) {
+    pendingSheets[idx].warehouse = value;
+  }
+};
+
+els.confirmBtn.addEventListener('click', async () => {
+  if (!pendingToken) return;
+  const mapping = {};
+  els.sheetsBody.querySelectorAll('select[data-sheet-index]').forEach(sel => {
+    const idx = Number(sel.dataset.sheetIndex);
+    const sheet = pendingSheets[idx];
+    if (sheet) {
+      mapping[sheet.sheet_name] = sel.value;
+      sheet.warehouse = sel.value;
+    }
+  });
+  els.uploadStatus.textContent = 'Loading into MongoDB...';
+  try {
+    const res = await fetch('/upload/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: pendingToken, location: els.uploadLocation.value, mapping }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    els.uploadStatus.textContent = `Loaded ${data.loaded.length} sheet(s) into MongoDB \u2713`;
+    els.assignPanel.style.display = 'none';
+    pendingToken = null;
+    els.fileInput.value = '';
+    loadMonthYearOptions();
+  } catch (err) {
+    els.uploadStatus.textContent = 'Load failed: ' + err.message;
+  }
+});
+
+// ---- Browse / filter ----
+els.showDataBtn.addEventListener('click', loadData);
+els.generatePayrollBtn.addEventListener('click', generatePayroll);
+
+document.getElementById('downloadPayrollBtn').addEventListener('click', () => {
+  const month = els.filterMonth.value;
+  const year = els.filterYear.value;
+  if (!month || !year) {
+    alert('Please select Month and Year first.');
+    return;
+  }
+  const params = new URLSearchParams();
+  params.set('month', month);
+  params.set('year', year);
+  if (els.filterLocation.value) params.set('location', els.filterLocation.value);
+  if (els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
+  window.open('/payroll/download?' + params.toString(), '_blank');
+});
+
+
+
+const NON_EDITABLE_COLUMNS = new Set([
+  'ATTENDANCE - Present Days',
+  'ATTENDANCE - Pay Days',
+]);
+
+async function loadData() {
+  const params = new URLSearchParams();
+  if (els.filterLocation.value)  params.set('location',  els.filterLocation.value);
+  if (els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
+  if (els.filterMonth.value)     params.set('month',     els.filterMonth.value);
+  if (els.filterYear.value)      params.set('year',      els.filterYear.value);
+  els.dataStatus.textContent = 'Loading...';
+  try {
+    const res = await fetch('/data?' + params.toString());
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    currentColumns = data.columns;
+    renderDataTable(data.columns, data.rows);
+    const monthYearSelected = Boolean(els.filterMonth.value && els.filterYear.value);
+    if (!monthYearSelected) {
+      els.dataStatus.textContent =
+        `Loaded ${data.rows.length} row(s) across ${data.collections.length} sheet(s). ` +
+        'Select a Month and Year to enable salary editing for that month.';
+    } else {
+      els.dataStatus.textContent =
+        `${data.rows.length} row(s) across ${data.collections.length} sheet(s)`;
+    }
+  } catch (err) {
+    els.dataStatus.textContent = 'Load failed: ' + err.message;
+  }
+}
+
+async function generatePayroll() {
+  if (!els.filterMonth.value || !els.filterYear.value) {
+    els.generatePayrollStatus.style.color = 'red';
+    els.generatePayrollStatus.textContent = 'Select Month and Year before generating payroll.';
+    return;
+  }
+
+  const payload = {
+    month: Number(els.filterMonth.value),
+    year: Number(els.filterYear.value),
+  };
+  if (els.filterLocation.value) payload.location = els.filterLocation.value;
+  if (els.filterWarehouse.value) payload.warehouse = els.filterWarehouse.value;
+
+  els.generatePayrollStatus.style.color = 'green';
+  els.generatePayrollStatus.textContent = 'Generating payroll...';
+  try {
+    const res = await fetch('/payroll/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    const data = await res.json();
+    els.generatePayrollStatus.textContent =
+      `Payroll generated: created ${data.created}, skipped ${data.skipped}`;
+    loadMonthYearOptions();
+    loadData();
+  } catch (err) {
+    els.generatePayrollStatus.style.color = 'red';
+    els.generatePayrollStatus.textContent = 'Generate failed: ' + err.message;
+  }
+}
+
+// ---- Render table ----
+function renderDataTable(columns, rows) {
+  editingRows = {};
+  const metaCols = ['_sheet', '_warehouse'];
+  const monthYearSelected = Boolean(els.filterMonth.value && els.filterYear.value);
+  const head = '<thead><tr><th>Actions</th>' +
+    metaCols.map(c => `<th>${c.slice(1)}</th>`).join('') +
+    columns.map(c => `<th>${escapeHtml(c)}</th>`).join('') +
+    '</tr></thead>';
+
+  const body = '<tbody>' + rows.map(r => {
+    const rowKey = `${r._collection}__${r._row_id}`;
+    const editButton = monthYearSelected ?
+      `<button class="btn-edit" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>` :
+      `<button class="btn-edit" disabled title="Select Month and Year to edit salary records">Edit</button>`;
+    return `<tr data-collection="${escapeAttr(r._collection)}"
+               data-row-id="${r._row_id}" data-row-key="${escapeAttr(rowKey)}">
+      <td style="white-space:nowrap;">
+        ${editButton}
+      </td>` +
+      metaCols.map(c => `<td class="meta">${escapeHtml(r[c] ?? '')}</td>`).join('') +
+      columns.map(c =>
+        `<td data-col="${escapeAttr(c)}">${escapeHtml(r[c] ?? '')}</td>`
+      ).join('') +
+    '</tr>';
+  }).join('') + '</tbody>';
+
+  els.dataTable.innerHTML = head + body;
+}
+
+// ---- Calculation Log Panel ----
+function showLog(lines) {
+  const panel = document.getElementById('calcLogPanel');
+  const body  = document.getElementById('calcLogBody');
+  body.textContent = lines.join('\n');
+  panel.classList.add('open');
+  body.scrollTop = 0;
+}
+function closeLog() {
+  document.getElementById('calcLogPanel').classList.remove('open');
+}
+function clearLog() {
+  document.getElementById('calcLogBody').textContent = '';
+}
+
+// toggle panel collapse on header click
+document.getElementById('calcLogHeader').addEventListener('click', e => {
+  if (e.target.tagName === 'BUTTON') return;
+  const body = document.getElementById('calcLogBody');
+  body.style.display = body.style.display === 'none' ? '' : 'none';
+});
+
+// ---- Edit mode ----
+function startEdit(rowKey) {
+  const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
+  if (!tr) return;
+
+  // swap edit button for save+cancel
+  const actionTd = tr.querySelector('td:first-child');
+  actionTd.innerHTML =
+    `<button class="btn-save" onclick="saveRow('${escapeAttr(rowKey)}')">Save</button>` +
+    `<button class="btn-cancel" style="margin-left:4px;" onclick="cancelEdit('${escapeAttr(rowKey)}')">Cancel</button>`;
+
+  // make each data cell editable, except attendance totals that are derived from attendance input
+  const originals = {};
+  tr.querySelectorAll('td[data-col]').forEach(td => {
+    const col = td.dataset.col;
+    const val = td.textContent;
+    originals[col] = val;
+    if (NON_EDITABLE_COLUMNS.has(col)) {
+      td.innerHTML = `<span style="color:#555;">${escapeHtml(val)}</span>`;
+    } else {
+      td.innerHTML = `<input class="cell-input" type="text" data-col="${escapeAttr(col)}" value="${escapeAttr(val)}">`;
+    }
+  });
+  editingRows[rowKey] = originals;
+}
+
+function cancelEdit(rowKey) {
+  const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
+  if (!tr) return;
+  const originals = editingRows[rowKey] || {};
+
+  tr.querySelector('td:first-child').innerHTML =
+    `<button class="btn-edit" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>`;
+
+  tr.querySelectorAll('td[data-col]').forEach(td => {
+    const col = td.dataset.col;
+    td.innerHTML = escapeHtml(originals[col] ?? '');
+  });
+  delete editingRows[rowKey];
+}
+
+async function saveRow(rowKey) {
+  const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
+  if (!tr) return;
+  const collection = tr.dataset.collection;
+  const rowId = tr.dataset.rowId;
+
+  const payload = {};
+  tr.querySelectorAll('input.cell-input[data-col]').forEach(inp => {
+    payload[inp.dataset.col] = inp.value;
+  });
+
+  els.dataStatus.textContent = 'Saving...';
+  try {
+    const res = await fetch(
+      `/collections/${encodeURIComponent(collection)}/${encodeURIComponent(rowId)}`,
+      { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload) }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    // show calculation log
+    if (data.calc_log && data.calc_log.length) {
+      showLog(data.calc_log);
+    }
+
+    // update cells with recalculated values from server
+    const updated = data.row;
+    tr.querySelector('td:first-child').innerHTML =
+      `<button class="btn-edit" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>`;
+    tr.querySelectorAll('td[data-col]').forEach(td => {
+      const col = td.dataset.col;
+      const newVal = updated[col] ?? '';
+      td.innerHTML = escapeHtml(newVal);
+    });
+    delete editingRows[rowKey];
+    els.dataStatus.textContent = 'Saved \u2713';
+    setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
+  } catch (err) {
+    els.dataStatus.textContent = 'Save failed: ' + err.message;
+  }
+}
+
+function getRowData(tr) {
+  const row = { collection: tr.dataset.collection, rowId: tr.dataset.rowId };
+  tr.querySelectorAll('td[data-col]').forEach(td => {
+    row[td.dataset.col] = td.textContent;
+  });
+  return row;
+}
+
+async function recalculateRow(rowKey) {
+  const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
+  if (!tr) return;
+  const collection = tr.dataset.collection;
+  const rowId = tr.dataset.rowId;
+  els.dataStatus.textContent = 'Recalculating...';
+  try {
+    const res = await fetch(
+      `/collections/${encodeURIComponent(collection)}/${encodeURIComponent(rowId)}/recalculate`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    const updated = data.row;
+    tr.querySelectorAll('td[data-col]').forEach(td => {
+      const col = td.dataset.col;
+      td.innerHTML = escapeHtml(updated[col] ?? '');
+    });
+    if (data.calc_log && data.calc_log.length) {
+      showLog(data.calc_log);
+    }
+    els.dataStatus.textContent = 'Recalculated ';
+    setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
+  } catch (err) {
+    els.dataStatus.textContent = 'Recalc failed: ' + err.message;
+  }
+}
+
+async function deleteEmployeeRow(rowKey) {
+  const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
+  if (!tr) return;
+  const row = getRowData(tr);
+  const empId = row.emp_id || row['EMP_ID'] || row['Emp Id'];
+  const location = row.location || row.Location || tr.querySelector('td[data-col="location"]')?.textContent || '';
+  const warehouse = row.warehouse || row.Warehouse || tr.querySelector('td[data-col="warehouse"]')?.textContent || '';
+  if (!empId || !location || !warehouse) {
+    alert('Cannot delete employee: missing emp_id, location or warehouse');
+    return;
+  }
+  if (!confirm(`Delete employee ${empId} from ${location}/${warehouse} for all months? This cannot be undone.`)) {
+    return;
+  }
+  els.dataStatus.textContent = 'Deleting employee...';
+  try {
+    const res = await fetch(
+      `/employee/${encodeURIComponent(location)}/${encodeURIComponent(warehouse)}/${encodeURIComponent(empId)}`,
+      { method: 'DELETE' }
+    );
+    if (!res.ok) throw new Error(await res.text());
+    await loadData();
+    els.dataStatus.textContent = `Deleted ${empId} `;
+    setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
+  } catch (err) {
+    els.dataStatus.textContent = 'Delete failed: ' + err.message;
+  }
+}
+
+// ---- Add Employee modal ----
+if (els.addEmpBtn) {
+  els.addEmpBtn.addEventListener('click', async () => {
+    const res = await fetch('/collections');
+    const data = await res.json();
+    els.empCollection.innerHTML = data.collections.map(c =>
+      `<option value="${escapeAttr(c.name)}">${escapeHtml(c.name)} (${escapeHtml(c.location||'')} / ${escapeHtml(c.warehouse||'')})</option>`
+    ).join('');
+
+    async function loadFields() {
+      const name = els.empCollection.value;
+      if (!name) { els.empFormFields.innerHTML = ''; return; }
+      const r = await fetch(`/collections/${encodeURIComponent(name)}`);
+      const d = await r.json();
+      els.empFormFields.innerHTML = (d.columns || []).map(c =>
+        `<div class="emp-field">
+          <label>${escapeHtml(c)}</label>
+          <input type="text" data-col="${escapeAttr(c)}" placeholder="${escapeAttr(c)}">
+        </div>`
+      ).join('');
+    }
+    els.empCollection.onchange = loadFields;
+    await loadFields();
+    els.empFormStatus.textContent = '';
+    els.empModal.classList.add('open');
+  });
+}
+
+els.empCancelBtn.addEventListener('click', () => els.empModal.classList.remove('open'));
+els.empModal.addEventListener('click', e => {
+  if (e.target === els.empModal) els.empModal.classList.remove('open');
+});
+
+els.empSaveBtn.addEventListener('click', async () => {
+  const targetCollection = els.empCollection.value;
+  if (!targetCollection) {
+    els.empFormStatus.style.color = 'red';
+    els.empFormStatus.textContent = 'Please select a collection.';
+    return;
+  }
+  const payload = {};
+  els.empFormFields.querySelectorAll('input[data-col]').forEach(inp => {
+    payload[inp.dataset.col] = inp.value;
+  });
+  els.empFormStatus.style.color = 'green';
+  els.empFormStatus.textContent = 'Saving...';
+  try {
+    const res = await fetch(`/collections/${encodeURIComponent(targetCollection)}/rows`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    els.empFormStatus.textContent = 'Employee added \u2713';
+    setTimeout(() => {
+      els.empModal.classList.remove('open');
+      loadData();
+    }, 900);
+  } catch (err) {
+    els.empFormStatus.style.color = 'red';
+    els.empFormStatus.textContent = 'Save failed: ' + err.message;
+  }
+});
+
+// ---- Payroll Settings ----
+const SETTINGS_LABELS = {
+  employee_pf_percent:        'Employee PF %',
+  employer_pf_percent:        'Employer PF %',
+  employee_esi_percent:       'Employee ESI %',
+  employer_esi_percent:       'Employer ESI %',
+  pf_wage_ceiling:            'PF Wage Ceiling (₹)',
+  esi_eligibility_ceiling:    'ESI Eligibility Ceiling (₹)',
+  professional_tax_amount:    'Professional Tax Amount (₹)',
+  professional_tax_threshold: 'Professional Tax Threshold (₹)',
+};
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/admin/payroll-settings');
+    const cfg = await res.json();
+    const grid = document.getElementById('settingsGrid');
+    grid.innerHTML = Object.entries(SETTINGS_LABELS).map(([key, label]) =>
+      `<label>${label}
+        <input type="number" step="any" id="cfg_${key}" value="${cfg[key] ?? ''}">
+      </label>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('settingsStatus').textContent = 'Failed to load settings.';
+  }
+}
+
+function toggleSettings() {
+  const body = document.getElementById('settingsBody');
+  const tog  = document.getElementById('settingsToggle');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  tog.textContent = open ? '(click to collapse)' : '(click to expand)';
+  if (open) loadSettings();
+}
+
+async function saveSettings() {
+  const payload = {};
+  Object.keys(SETTINGS_LABELS).forEach(key => {
+    const el = document.getElementById('cfg_' + key);
+    if (el) payload[key] = parseFloat(el.value);
+  });
+  const statusEl = document.getElementById('settingsStatus');
+  statusEl.style.color = 'green';
+  statusEl.textContent = 'Saving...';
+  try {
+    const res = await fetch('/admin/payroll-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    statusEl.textContent = 'Settings saved \u2713 — new calculations will use updated values.';
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+  } catch(e) {
+    statusEl.style.color = 'red';
+    statusEl.textContent = 'Save failed: ' + e.message;
+  }
+}
+
+loadWarehouses().then(loadMonthYearOptions);
+</script>
+</body>
+</html>
