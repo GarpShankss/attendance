@@ -41,7 +41,7 @@ app = FastAPI()
 
 # internal/meta fields - never shown as a data column, never editable
 HIDDEN_FIELDS = {"_id", "_row_id", "_source_file", "_sheet", "_location", "_warehouse",
-                 "_upload_month", "_upload_year", "created_at", "updated_at", "status", "identity"}
+                 "_upload_month", "_upload_year", "_collection", "created_at", "updated_at", "status", "identity"}
 
 # token -> temp file path, held between /upload/preview and /upload/confirm
 PENDING_UPLOADS = {}
@@ -673,14 +673,37 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
     flat_docs = [_flatten_doc(d) for d in docs]
 
     COLUMN_GROUPS = [
-        ("Employee Details", ["emp_id", "emp_name", "location", "warehouse", "Designation", "Department", "status", "DOJ", "Bank Account Number", "Bank Name", "IFSC", "UAN", "ESI Number", "PAN", "Email", "Mobile Number"]),
-        ("Fixed", ["Fixed Basic", "Fixed DA", "Fixed Other", "Leave", "Bonus", "Fixed SC", "Uniform", "Shoes", "T Shirt", "Fixed Gross"]),
-        ("Attendance", ["ATTENDANCE - Working Days", "ATTENDANCE - Present Days", "ATTENDANCE - Pay Days", "ATTENDANCE - LOP", "ATTENDANCE - Absent Days"]),
-        ("Earned", ["EARNING - Basic", "EARNING - DA", "EARNING - Other", "EARNING - Leave", "EARNING - Bonus", "Total Earnings"]),
-        ("Deductions", ["Deductions - PF 12%", "Deductions - ESIC 0.75%", "Deductions - PT", "Deductions - Advance", "Total Deduction"]),
-        ("Employer Contribution", ["CONTRIBUTION - PF 13%", "CONTRIBUTION - ESIC @ 3.25%", "Employer Contribution"]),
-        ("CTC", ["CTC", "CONTRIBUTION - Service Charge", "CONTRIBUTION - Uniform Charges", "CONTRIBUTION - T Shirt", "CONTRIBUTION - Shoes", "Total CTC"]),
-        ("Net Pay", ["net_pay"])
+        ("Employee Details", [
+            ("Emp ID", "emp_id"), ("Employee Name", "Employee Name"), ("Location", "location"), ("Warehouse", "warehouse"),
+            ("Designation", "Designation"), ("Department", "Department"), ("Active Status", "Active Status"), ("DOJ", "DOJ"),
+            ("ACCOUNT", "ACCOUNT"), ("Bank Name", "Bank Name"), ("IFSC", "IFSC"), ("UAN", "UAN"),
+            ("ESIC", "ESIC"), ("PAN", "PAN"), ("Email", "Email"), ("Mobile Number", "Mobile Number")
+        ]),
+        ("Fixed", [
+            ("Working Days", "FIXED - Working Days"), ("Basic", "FIXED - Basic"), ("DA", "FIXED - DA"), ("Other Allows", "FIXED - Other Allows"),
+            ("Leave With wages", "FIXED - Leave With wages"), ("Bonus @8.33%", "FIXED - Bonus @8.33%"), ("Total", "FIXED - Total")
+        ]),
+        ("Attendance", [
+            ("Present Days", "ATTENDANCE - Present Days"), ("Holi day", "ATTENDANCE - Holi day"), ("Pay Days", "ATTENDANCE - Pay Days"), ("OT Hours", "ATTENDANCE - OT Hours")
+        ]),
+        ("Earned", [
+            ("Basic", "EARNING - Basic"), ("DA", "EARNING - DA"), ("Other Allows", "EARNING - Other Allows"), ("Leave With wages", "EARNING - Leave With wages"),
+            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("OT Amount", "EARNING - OT Amount"), ("Total", "EARNING - Total")
+        ]),
+        ("Deductions", [
+            ("PF 12%", "Deductions - PF 12%"), ("ESIC 0.75%", "Deductions - ESIC 0.75%"), ("PT", "Deductions - PT"), ("Adv", "Deductions - Adv"),
+            ("Total Deduction", "Deductions - Total Deduction")
+        ]),
+        ("Employer Contribution", [
+            ("EPF @ 13%", "CONTRIBUTION - EPF @ 13%"), ("ESIC @ 3.25%", "CONTRIBUTION - ESIC @ 3.25%"), ("Total Employer Contribution", "CONTRIBUTION - Total Employer Contribution")
+        ]),
+        ("CTC", [
+            ("CTC", "CONTRIBUTION - CTC"), ("Service Charge", "CONTRIBUTION - Service Charge"), ("Uniform Charges", "CONTRIBUTION - Uniform Charges"), ("T Shirt", "CONTRIBUTION - T Shirt"),
+            ("Shoes", "CONTRIBUTION - Shoes"), ("Total CTC", "CONTRIBUTION - Total CTC")
+        ]),
+        ("Net Pay", [
+            ("Net Pay", "Net Pay")
+        ])
     ]
 
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
@@ -717,9 +740,9 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
     col_idx = 1
     all_columns = []
     for group_name, cols in COLUMN_GROUPS:
-        for c_name in cols:
-            all_columns.append(c_name)
-            cell = ws.cell(row=2, column=col_idx, value=c_name.replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", ""))
+        for header_name, db_key in cols:
+            all_columns.append(db_key)
+            cell = ws.cell(row=2, column=col_idx, value=header_name)
             cell.fill = fill_header
             cell.font = font_header
             cell.alignment = align_center
@@ -1057,19 +1080,22 @@ def save_attendance(location: str, warehouse: str, emp_id: str,
         }
         for k, v in calculated.items():
             if k not in {"__calc_log__", "_id"} and not isinstance(v, dict):
-                if k.startswith("EARNING -") or k.startswith("Deductions -") \
-                   or k.startswith("CONTRIBUTION -") or k == "Net Pay":
+                if k.startswith("EARNING -"):
+                    update_fields[f"earnings.{k}"] = v
                     update_fields[k] = v
+                elif k.startswith("Deductions -"):
+                    update_fields[f"deductions.{k}"] = v
+                    update_fields[k] = v
+                elif k.startswith("CONTRIBUTION -"):
+                    update_fields[f"contributions.{k}"] = v
+                    update_fields[k] = v
+                elif k == "Net Pay":
+                    update_fields["net_pay"] = v
+                    update_fields["Net Pay"] = v
         if update_fields:
             db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
 
-    try:
-        db[ATTENDANCE_COLL].create_index(
-            [("emp_id",1),("location",1),("warehouse",1)],
-            unique=True, background=True
-        )
-    except Exception as e:
-        print(f"Warning: could not create unique index on _attendance: {e}")
+
     return {"ok": True}
 
 
@@ -1141,6 +1167,136 @@ def get_attendance_employees(location: str, warehouse: str, month: int, year: in
 
 
 # ---------------------------------------------------------------------------
+
+@app.get("/attendance/download")
+def download_attendance(month: int, year: int, location: str, warehouse: str):
+    from fastapi.responses import StreamingResponse
+    import io
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    import calendar
+    from datetime import timedelta, datetime
+    
+    data = get_attendance_employees(location, warehouse, month, year)
+    employees = data["employees"]
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Attendance_{month}_{year}"
+    
+    # Calculate dates: 26th of previous-previous month to 25th of previous month
+    # Actually wait, in attendance.html:
+    # const start = new Date(year, month - 2, 26);
+    # const end = new Date(year, month - 1, 25);
+    
+    start_year = year
+    start_month = month - 1
+    if start_month < 1:
+        start_month += 12
+        start_year -= 1
+        
+    start_date = datetime(start_year, start_month, 26)
+    
+    end_year = year
+    end_month = month
+    if end_month < 1:
+        end_month += 12
+        end_year -= 1
+        
+    # Wait, the logic in frontend is: month - 2 to month - 1
+    # Example: month=7 (July). start = Date(year, 5, 26) -> June 26th. 
+    # end = Date(year, 6, 25) -> July 25th.
+    
+    from datetime import date
+    
+    # Let's just generate dates iteratively
+    d_start_month = month - 1
+    d_start_year = year
+    if d_start_month < 1:
+        d_start_month += 12
+        d_start_year -= 1
+        
+    d_end_month = month
+    d_end_year = year
+    if d_end_month < 1:
+        d_end_month += 12
+        d_end_year -= 1
+        
+    start_d = date(d_start_year, d_start_month, 26)
+    try:
+        end_d = date(d_end_year, d_end_month, 25)
+    except ValueError:
+        end_d = date(d_end_year, d_end_month, 25)
+        
+    dates = []
+    curr = start_d
+    while curr <= end_d:
+        dates.append(curr)
+        curr += timedelta(days=1)
+        
+    # Headers
+    headers = ["Emp ID", "Employee Name", "Department", "Designation"]
+    date_strs = [d.strftime("%Y-%m-%d") for d in dates]
+    headers.extend([str(d.day) for d in dates])
+    headers.extend(["Working Days", "Present Days", "Paid Days", "LOP", "Absent Days"])
+    
+    ws.append(headers)
+    
+    # Header styles
+    header_font = Font(bold=True)
+    for col_idx, col_name in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.font = header_font
+        if col_idx <= 4:
+            cell.fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+        elif col_idx <= 4 + len(dates):
+            # date columns
+            is_abm = dates[col_idx-5].month == d_start_month
+            if is_abm:
+                cell.fill = PatternFill(start_color="E0E7FF", end_color="E0E7FF", fill_type="solid")
+            else:
+                cell.fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+        else:
+            cell.fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+            
+    for emp in employees:
+        row = [
+            emp["emp_id"],
+            emp["emp_name"],
+            emp["department"],
+            emp["designation"]
+        ]
+        
+        days_dict = emp.get("days", {})
+        for d in dates:
+            d_str = d.strftime("%Y-%m-%d")
+            fallback = days_dict.get(str(d.day))
+            val = days_dict.get(d_str, fallback) or ""
+            if d.weekday() == 6 and not val:
+                val = "WO"
+            row.append(val)
+            
+        row.extend([
+            emp.get("working_days", 0),
+            emp.get("present_days", 0),
+            emp.get("pay_days", 0),
+            emp.get("lop", 0),
+            emp.get("absent_days", 0)
+        ])
+        ws.append(row)
+        
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=Attendance_{location}_{warehouse}_{month}_{year}.xlsx"}
+    )
+
+
 # Static files — keep LAST
 # ---------------------------------------------------------------------------
 # Resolve static files path relative to this file's directory

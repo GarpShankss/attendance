@@ -1,243 +1,342 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
+<meta charset="utf-8">
+<title>Payroll Management System</title>
+<!-- Dummy elements to prevent JS TypeErrors for features removed from this view -->
+<div style="display:none;">
+  <div id="empModal"></div>
+  <div id="empFormFields"></div>
+  <select id="empCollection"></select>
+  <button id="empSaveBtn"></button>
+  <button id="empCancelBtn"></button>
+  <div id="empFormStatus"></div>
+</div>
+
 <script>
   if (localStorage.getItem('rs_auth') !== 'authenticated') {
     window.location.href = '/login.html';
   }
+
+  // Aggressively prevent swipe-to-go-back trackpad gesture
+  window.addEventListener('wheel', (e) => {
+      // If it is a horizontal scroll
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+          let container = e.target.closest('.table-wrap');
+          if (!container) {
+              e.preventDefault();
+              return;
+          }
+          // Prevent if scrolling left at the very left edge
+          if (e.deltaX < 0 && container.scrollLeft <= 0) {
+              e.preventDefault();
+          }
+          // Prevent if scrolling right at the very right edge
+          if (e.deltaX > 0 && container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+              e.preventDefault();
+          }
+      }
+  }, { passive: false });
 </script>
-<meta charset="utf-8">
-<title>Payroll Data Editor</title>
 <style>
-  * { box-sizing: border-box; transition: all 0.2s ease; }
-  body {
-    font-family: sans-serif;
-    background: #f9f9f9;
-    color: #000;
-    margin: 0;
-    padding: 20px;
-}
-  h2 { margin-top: 0; }
-  nav {
-    background: #fff;
-    border: 1px solid #ddd;
-    padding: 10px;
-    margin-bottom: 20px;
-    display: flex;
-    gap: 20px;
-}
-  nav a { color: #000; text-decoration: none; font-weight: bold; }
-  nav a:hover { text-decoration: underline; }
-
-  section {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 16px;
-    margin-bottom: 24px;
-}
-  section h3 { margin-top: 0; color: #9ca3af; font-size: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
-
-  /* Tables */
-  table { border-collapse: collapse; margin-top: 10px; font-size: 12px; width: 100%; background: #fff; overflow: hidden; border: 1px solid #ddd; }
-  th, td { border: 1px solid #ddd; padding: 6px 10px; white-space: nowrap; text-align: left; }
-  th { background: #fde047; color: #000; font-weight: bold; position: sticky; top: 0; z-index: 1; }
-  td.meta { background: #f9f9f9; color: #666; font-style: italic; }
-  .table-wrap { max-height: 65vh; overflow: auto; margin-top: 10px; background: #fff; }
-
-  /* Inline edit inputs */
-  td input.cell-input { width: 100%; min-width: 80px; border: 1px solid #3b82f6; border-radius: 4px;
-    padding: 4px 8px; font-size: 12px; background: rgba(15, 23, 42, 0.9); color: #f8fafc; }
-
+  :root {
+    color-scheme: light;
+    --bg-color: #f4f7fb;
+    --surface: #ffffff;
+    --border: #dbe4ee;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-light: #eff6ff;
+    --success: #16a34a;
+    --warning: #f59e0b;
+    --danger: #dc2626;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --nav-bg: #1e293b;
+    --nav-text: #f8fafc;
+  }
+  
+  * { box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  option { background: #ffffff !important; color: #000000 !important; }
+  select { appearance: auto !important; background-color: #ffffff !important; color: #000000 !important; }
+  button, a, .btn-icon, .nav-link, tr, td { transition: all 0.2s ease; }
+  html, body { 
+    background: var(--bg-color); 
+    color: var(--text); 
+    margin: 0; 
+    padding: 0; 
+    min-height: 100vh; 
+    overflow-x: hidden; 
+    overscroll-behavior-x: none; 
+  }
+  
+  /* Enterprise Navigation */
+  .top-nav { background: var(--nav-bg); padding: 0 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; height: 60px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .nav-left { display: flex; align-items: center; gap: 16px; height: 100%; }
+  .logo-text { font-size: 16px; font-weight: 600; color: var(--nav-text); letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+  .nav-center { display: flex; gap: 4px; height: 100%; }
+  .nav-link { color: #94a3b8; text-decoration: none; font-weight: 500; font-size: 14px; padding: 0 16px; display: flex; align-items: center; height: 100%; border-bottom: 2px solid transparent; }
+  .nav-link:hover { color: var(--nav-text); background: rgba(255,255,255,0.05); }
+  .nav-link.active { color: var(--nav-text); border-bottom-color: #60a5fa; background: rgba(255,255,255,0.05); }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .user-profile { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--nav-text); }
+  
+  .container { padding: 24px; max-width: 100vw; display: flex; flex-direction: column; gap: 24px; }
+  
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .card h3 { margin: 0 0 20px 0; font-size: 16px; color: var(--text); font-weight: 600; }
+  
+  /* Dashboard Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid var(--primary); }
+  .stat-card:nth-child(2) { border-left-color: var(--success); }
+  .stat-card:nth-child(3) { border-left-color: var(--warning); }
+  .stat-card:nth-child(4) { border-left-color: #8b5cf6; }
+  .stat-card .label { font-size: 12px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--text); }
+  
+  /* Forms */
+  .filter-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 150px; max-width: 250px; }
+  label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  select, input[type="text"], input[type="file"], input[type="number"] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; outline: none; font-size: 14px; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
+  select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+  
   /* Buttons */
-  select, input[type="text"], input[type="number"], button {
-    background: rgba(17, 24, 39, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #f3f4f6;
-    padding: 6px 12px;
-    border-radius: 6px;
-    outline: none;
-    font-size: 13px;
-  }
-  select:focus, input:focus {
-    border-color: #60a5fa;
-    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
-  }
-  select option {
-    background-color: #111827;
-    color: #f3f4f6;
-  }
-  label {
-    font-size: 13px;
-    color: #9ca3af;
-  }
-  label strong {
-    color: #f3f4f6;
-  }
-  button {
-    font-weight: 600;
-    cursor: pointer;
-    border: none;
-  }
-  button:hover {
-    transform: translateY(-1px);
-  }
+  button { font-weight: 500; cursor: pointer; border: 1px solid transparent; padding: 8px 16px; border-radius: 6px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  button:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+  button:active { transform: translateY(0); }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-success { background: var(--success); color: white; }
+  .btn-warning { background: var(--warning); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-outline { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg-color); }
+  .btn-nav { background: transparent; border: none; color: #94a3b8; box-shadow: none; padding: 6px; border-radius: 4px; }
+  .btn-nav:hover { background: rgba(255,255,255,0.1); color: white; box-shadow: none; }
   
-  .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; }
-  .btn-edit { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); }
-  .btn-edit:hover { background: #2563eb; color: white; }
-  .btn-save { background: linear-gradient(135deg, #059669, #047857); color: #fff; }
-  .btn-cancel { background: #374151; color: #d1d5db; border: 1px solid rgba(255,255,255,0.05); }
+  .action-toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; margin-bottom: 20px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
   
-  .status { margin-left: 10px; font-weight: bold; color: #000; }
-
-  /* Modal */
-  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-    z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-  .modal-bg.open { display: flex; }
-  .modal-box { background: #111827; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px 28px;
-    width: 90%; max-width: 560px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
-  .modal-box h3 { margin-top: 0; margin-bottom: 16px; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  .emp-field { display: flex; flex-direction: column; margin-bottom: 12px; }
-  .emp-field label { font-size: 12px; color: #9ca3af; margin-bottom: 4px; font-weight: 600; }
-  .emp-field input { padding: 8px 12px; font-size: 13px; background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #f3f4f6; border-radius: 8px; }
-  .emp-field input:focus { border-color: #60a5fa; }
-  .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
-  .modal-save { background: linear-gradient(135deg, #059669, #047857); color: #fff; border: none; border-radius: 8px; padding: 8px 24px; cursor: pointer; font-size: 13px; }
-  .modal-cancel { background: #374151; border: 1px solid rgba(255,255,255,0.05); color: #d1d5db; border-radius: 8px; padding: 8px 20px; cursor: pointer; font-size: 13px; }
-  .modal-status { font-size: 13px; margin-top: 10px; min-height: 18px; }
-
-  /* Calc log panel */
-  #calcLogPanel { display:none; position:fixed; bottom:0; right:0; width:520px;
-    max-height:45vh; background:#1e1e1e; color:#d4d4d4; font-family:monospace;
-    font-size:12px; border-top-left-radius:12px; z-index:200; border: 1px solid rgba(255,255,255,0.08);
-    box-shadow:0 -5px 25px rgba(0,0,0,0.5); flex-direction:column; }
-  #calcLogPanel.open { display:flex; }
-  #calcLogHeader { background:#2d2d2d; padding:8px 16px; display:flex;
-    justify-content:space-between; align-items:center; cursor:pointer;
-    border-top-left-radius:12px; flex-shrink:0; }
-  #calcLogHeader span { color:#fff; font-weight:600; font-size:13px; }
-  #calcLogHeader button { background:none; border:none; color:#aaa;
-    font-size:16px; cursor:pointer; padding:0 4px; }
-  #calcLogBody { overflow-y:auto; padding:12px 16px; white-space:pre;
-    flex:1; line-height:1.5; }
-  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; margin-top: 10px; }
-  .settings-grid label { display: flex; flex-direction: column; font-size: 13px; gap: 4px; color: #9ca3af; }
-  .settings-grid input { padding: 8px 12px; font-size: 13px; background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: #f3f4f6; border-radius: 8px; width: 100%; }
-  #settingsStatus { font-size: 13px; margin-top: 10px; min-height: 18px; }
+  /* Enterprise Table */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); max-height: 65vh; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overscroll-behavior-x: none; }
+  table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; }
+  th, td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 10px 14px; white-space: nowrap; text-align: left; color: var(--text); }
+  
+  /* Sticky Headers */
+  th { position: sticky; top: 0; z-index: 10; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  th.group-header { background: #f8fafc; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; text-align: center; border-bottom: 2px solid var(--border); top: 0; z-index: 20; }
+  th.sub-header { background: var(--surface); color: var(--text); top: 38px; z-index: 10; }
+  
+  /* Sticky Columns */
+  .sticky-col { position: sticky; z-index: 11; background: var(--surface); }
+  .actions-col { left: 0; min-width: 200px; max-width: 200px; border-right: 2px solid var(--border); }
+  .emp-id-col { left: 200px; min-width: 120px; max-width: 120px; border-right: 1px solid var(--border); }
+  .emp-name-col { left: 320px; min-width: 160px; max-width: 160px; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  
+  th.actions-col, th.emp-id-col, th.emp-name-col { z-index: 21; }
+  
+  /* Hover effects */
+  tbody tr:nth-child(even) td { background: #f9fafb; }
+  tbody tr:hover td { background: var(--primary-light) !important; }
+  
+  td.cell-actions { display: flex; gap: 4px; padding: 6px; }
+  
+  /* Icon Buttons in Table */
+  .btn-icon { padding: 6px; border-radius: 4px; background: transparent; color: var(--text-muted); border: 1px solid transparent; box-shadow: none; display: inline-flex; }
+  .btn-icon:hover { background: var(--border); color: var(--text); box-shadow: none; transform: none; }
+  .btn-icon.edit:hover { color: var(--primary); background: var(--primary-light); }
+  .btn-icon.save { color: var(--success); }
+  .btn-icon.save:hover { background: #dcfce7; }
+  .btn-icon.cancel { color: var(--warning); }
+  .btn-icon.delete:hover { color: var(--danger); background: #fee2e2; }
+  .btn-icon.generate:hover { color: var(--primary); background: var(--primary-light); }
+  .btn-icon.download:hover { color: var(--success); background: #dcfce7; }
+  .btn-icon.wa:hover { color: #10b981; background: #d1fae5; }
+  
+  td input.cell-input { background: var(--surface); border: 1px solid var(--primary); padding: 6px 10px; border-radius: 4px; min-width: 80px; width: 100%; box-shadow: 0 0 0 2px var(--primary-light); }
+  
+  /* Settings Accordion */
+  .accordion-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .accordion-header { padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 600; background: #f8fafc; color: var(--text); }
+  .accordion-header:hover { background: #f1f5f9; }
+  .accordion-body { padding: 20px; display: none; border-top: 1px solid var(--border); }
+  .accordion-item.open .accordion-body { display: block; }
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  
+  /* Empty State */
+  .empty-state { padding: 80px 20px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: 8px; }
+  .empty-state svg { width: 64px; height: 64px; opacity: 0.3; color: var(--primary); }
+  .empty-state h4 { margin: 0; font-size: 18px; color: var(--text); font-weight: 600; }
+  .empty-state p { margin: 0; font-size: 14px; }
+  
+  /* Toasts */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 12px; z-index: 9999; }
+  .toast { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 14px 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); border-left: 4px solid transparent; }
+  .toast.success { border-left-color: var(--success); }
+  .toast.error { border-left-color: var(--danger); }
+  .toast.warning { border-left-color: var(--warning); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  
+  /* Loader Overlay */
+  .loader-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--text); font-weight: 600; }
+  .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-left-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 
-<nav style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-  <div style="display: flex; gap: 20px;">
-    <a href="/" style="color:#60a5fa; text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); font-weight: 600;">&#127968; Salary Sheet</a>
-    <a href="/attendance.html">&#128197; Attendance</a>
-    <a href="/add_employee.html">&#10133; Add Employee</a>
+<nav class="top-nav">
+  <div class="nav-left">
+    <div class="logo-text">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      Payroll Management System
+    </div>
   </div>
-  <button id="toggleUploadBtn" class="btn-primary" style="padding: 8px 18px; font-size: 13px; margin: 0;">📂 Upload File</button>
+  <div class="nav-center">
+    <a href="/" class="nav-link active">Salary</a>
+    <a href="/attendance.html" class="nav-link">Attendance</a>
+    <a href="/add_employee.html" class="nav-link">Employees</a>
+  </div>
+  <div class="nav-right">
+    <button id="toggleUploadBtn" class="btn-outline" style="background: white; border: none; padding: 6px 12px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+      Upload
+    </button>
+    <div class="user-profile">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      Admin
+    </div>
+    <button id="logoutBtn" class="btn-nav" title="Logout">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+    </button>
+  </div>
 </nav>
-<h2>Payroll Data Editor</h2>
 
-<!-- Section 1: Upload -->
-<section id="uploadSection" style="display: none;">
-  <h3>1. Upload a file</h3>
-  <p style="margin-top:0;">
-    <label><strong>Location:</strong>&nbsp;
-      <select id="uploadLocation" style="min-width:140px;"></select>
-    </label>
-  </p>
-  <input type="file" id="fileInput" accept=".xlsx,.xls">
-  <button id="parseBtn">Parse File</button>
-  <span class="status" id="uploadStatus"></span>
-  <div id="assignPanel">
-    <p style="margin-bottom:6px;">Assign each sheet to a warehouse (or skip it):</p>
-    <table>
-      <thead><tr><th>Sheet</th><th>Rows</th><th>Warehouse</th></tr></thead>
-      <tbody id="sheetsBody"></tbody>
-    </table>
-    <button id="confirmBtn" style="margin-top:10px;">Confirm &amp; Load into MongoDB</button>
-  </div>
-</section>
-
-<!-- Section 2: Browse + filter -->
-<section>
-  <h3>2. Browse / filter data</h3>
-  <div class="filter-row">
-    <label>Location:
-      <select id="filterLocation" style="min-width:140px;"></select>
-    </label>
-    <label>Warehouse:
-      <select id="filterWarehouse" style="min-width:140px;"></select>
-    </label>
-    <label>Month:
-      <select id="filterMonth" style="min-width:120px;">
-        <option value="">All months</option>
-      </select>
-    </label>
-    <label>Year:
-      <select id="filterYear" style="min-width:90px;">
-        <option value="">All years</option>
-      </select>
-    </label>
-    <button id="showDataBtn">Show Data</button>
-    <button id="generatePayrollBtn" class="btn-primary" style="margin-left:8px;">Generate Payroll</button>
-    <button id="downloadPayrollBtn" style="margin-left:8px; background:#2e7d32; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Download Payroll</button>
-    <button id="btnGenerateAll" style="margin-left:8px; background:#1976d2; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Generate All Payslips</button>
-    <button id="btnDownloadAll" style="margin-left:8px; background:#f57c00; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Download All Payslips</button>
-    <button id="btnWaAll" style="margin-left:8px; background:#388e3c; color:#fff; border:none; border-radius:4px; padding:4px 10px; cursor:pointer;">Send All WhatsApp</button>
-
-    <span class="status" id="generatePayrollStatus"></span>
-    <span class="status" id="dataStatus"></span>
-  </div>
-
-  <div class="table-wrap">
-    <table id="dataTable"></table>
-  </div>
-</section>
-
-<!-- Section 3: Payroll Settings -->
-<section id="settingsSection">
-  <h3 style="cursor:pointer; user-select:none;" onclick="toggleSettings()">
-    &#9881; Payroll Settings
-    <span id="settingsToggle" style="font-size:12px; color:#666; margin-left:8px;">(click to expand)</span>
-  </h3>
-  <div id="settingsBody" style="display:none;">
-    <div class="settings-grid" id="settingsGrid"></div>
-    <div style="margin-top:14px;">
-      <button onclick="saveSettings()" style="background:#2e7d32;color:#fff;border:none;border-radius:4px;padding:6px 18px;cursor:pointer;font-size:13px;">Save Settings</button>
-    </div>
-    <div id="settingsStatus"></div>
-  </div>
-</section>
-
-<!-- Calculation Log Panel -->
-<div id="calcLogPanel">
-  <div id="calcLogHeader">
-    <span>&#128196; Salary Calculation Log</span>
-    <div>
-      <button onclick="clearLog()" title="Clear">&#128465;</button>
-      <button onclick="closeLog()" title="Close">&times;</button>
-    </div>
-  </div>
-  <div id="calcLogBody"></div>
+<div class="loader-overlay" id="globalLoader">
+  <div class="spinner"></div>
+  <span id="loaderText">Processing...</span>
 </div>
 
-<!-- Add Employee Modal -->
-<div id="empModal" class="modal-bg">
-  <div class="modal-box">
-    <h3>Add Employee</h3>
-    <p style="margin:0 0 12px; font-size:13px; color:#555;">
-      Collection:&nbsp;
-      <select id="empCollection" style="min-width:220px;"></select>
-    </p>
-    <div id="empFormFields"></div>
-    <div class="modal-actions">
-      <button id="empSaveBtn" class="modal-save">Save</button>
-      <button id="empCancelBtn" class="modal-cancel">Cancel</button>
+<div class="container">
+  
+  <!-- Dashboard Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="label">Total Employees</span>
+      <span class="value" id="statEmp">0</span>
     </div>
-    <div id="empFormStatus" class="modal-status"></div>
+    <div class="stat-card">
+      <span class="label">Payrolls Generated</span>
+      <span class="value" id="statPayroll">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="label">Pending Payslips</span>
+      <span class="value" id="statPending">0</span>
+    </div>
+    <div class="stat-card">
+      <span class="label">Today's Date</span>
+      <span class="value" id="statDate">...</span>
+    </div>
   </div>
+
+  <!-- Upload Section -->
+  <div class="card" id="uploadSection" style="display: none;">
+    <h3>Upload Payroll File</h3>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Location</label>
+        <select id="uploadLocation"></select>
+      </div>
+      <div class="filter-group" style="flex:2; max-width: 400px;">
+        <label>File (.xlsx, .xls)</label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+      </div>
+      <button id="parseBtn" class="btn-primary" style="height: 38px;">Parse File</button>
+    </div>
+    <span class="status" id="uploadStatus" style="font-size:13px; color:var(--text-muted); margin-top:8px; display:inline-block;"></span>
+    
+    <div id="assignPanel" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
+      <h4 style="margin:0 0 12px 0; color:var(--text);">Assign Sheets</h4>
+      <div class="table-wrap" style="max-height: 40vh;">
+        <table>
+          <thead><tr><th class="sub-header">Sheet Name</th><th class="sub-header">Rows Found</th><th class="sub-header">Assign Warehouse</th></tr></thead>
+          <tbody id="sheetsBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;">
+        <button id="confirmBtn" class="btn-success">Confirm &amp; Load into Database</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter & Table Section -->
+  <div class="card" style="padding-bottom: 0;">
+    <h3>Salary Dashboard</h3>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Location</label>
+        <select id="filterLocation"></select>
+      </div>
+      <div class="filter-group">
+        <label>Warehouse</label>
+        <select id="filterWarehouse"></select>
+      </div>
+      <div class="filter-group">
+        <label>Month</label>
+        <select id="filterMonth"><option value="">All months</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Year</label>
+        <select id="filterYear"><option value="">All years</option></select>
+      </div>
+      <button id="showDataBtn" class="btn-primary" style="height: 38px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Show Data
+      </button>
+    </div>
+    
+    <div class="action-toolbar">
+      <button id="generatePayrollBtn" class="btn-primary">Generate Payroll</button>
+      <button id="downloadPayrollBtn" class="btn-outline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download Salary Sheet
+      </button>
+      <button id="btnGenerateAll" class="btn-primary" >Generate All Payslips</button>
+      <button id="btnDownloadAll" class="btn-outline">Download All Payslips</button>
+      <button id="btnWaAll" class="btn-success">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        Send All WhatsApp
+      </button>
+    </div>
+    <div id="generatePayrollStatus" style="font-size: 13px; margin-top: 8px; margin-bottom: 8px;"></div>
+  </div>
+
+  <div id="dataStatus" style="font-size: 14px; margin-bottom: 12px; font-weight: 500; text-align: center;"></div>
+
+  <div id="emptyState" class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+    <div>
+      <h4>No payroll data loaded</h4>
+      <p>Select location, warehouse, and month, then click Show Data.</p>
+    </div>
+  </div>
+  
+  <div class="table-wrap" id="tableWrap" style="display:none;">
+    <table id="dataTable"></table>
+  </div>
+  
+  <!-- Payroll Settings -->
+  <div class="card">
+    <h3>Payroll Settings</h3>
+    <div id="settingsGrid" class="settings-grid"></div>
+    <div style="margin-top:20px;">
+      <button id="saveSettingsBtn" class="btn-success" onclick="saveSettings()">Save Settings</button>
+      <span id="settingsStatus" style="margin-left: 10px; font-weight: 500; font-size: 14px; color: var(--success);"></span>
+    </div>
+  </div>
+  
 </div>
 
 <script>
@@ -271,7 +370,7 @@ const els = {
 };
 
 // Toggle Upload Panel
-document.getElementById('toggleUploadBtn').addEventListener('click', () => {
+if (document.getElementById('toggleUploadBtn')) document.getElementById('toggleUploadBtn').addEventListener('click', () => {
   const panel = document.getElementById('uploadSection');
   if (panel.style.display === 'none' || panel.style.display === '') {
     panel.style.display = 'block';
@@ -288,39 +387,43 @@ let currentColumns = [];
 let editingRows = {};
 
 function escapeHtml(v) {
-  return String(v ?? '').replace(/[&<>"]/g, m =>
+  return String(v != null ? v : '').replace(/[&<>"]/g, m =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 }
 const escapeAttr = escapeHtml;
 
 // ---- Boot ----
 async function loadWarehouses() {
-  const res = await fetch('/warehouses');
-  WAREHOUSES = await res.json();
-  const locations = Object.keys(WAREHOUSES);
-  els.uploadLocation.innerHTML = locations.map(l =>
-    `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
-  els.filterLocation.innerHTML = '<option value="">All locations</option>' +
-    locations.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
-  populateFilterWarehouse();
+  try {
+    const res = await fetch('/warehouses');
+    WAREHOUSES = await res.json();
+    const locations = Object.keys(WAREHOUSES);
+    if(els.uploadLocation) els.uploadLocation.innerHTML = '<option value="">All locations</option>' + locations.map(l =>
+      `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+    if(els.filterLocation) els.filterLocation.innerHTML = '<option value="">All locations (Loaded!)</option>' +
+      locations.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+    populateFilterWarehouse();
+  } catch(e) {
+    alert('Error in loadWarehouses: ' + e.message + '\n' + e.stack);
+  }
 }
 
 function populateFilterWarehouse() {
-  const loc = els.filterLocation.value;
+  const loc = els.filterLocation ? els.filterLocation.value : '';
   const whs = loc ? (WAREHOUSES[loc] || []) : [...new Set(Object.values(WAREHOUSES).flat())];
-  els.filterWarehouse.innerHTML = '<option value="">All warehouses</option>' +
+  if(els.filterWarehouse) els.filterWarehouse.innerHTML = '<option value="">All warehouses</option>' +
     whs.map(w => `<option value="${escapeAttr(w)}">${escapeHtml(w)}</option>`).join('');
 }
-els.filterLocation.addEventListener('change', () => {
+if(els.filterLocation) els.filterLocation.addEventListener('change', () => {
   populateFilterWarehouse();
   loadMonthYearOptions();
 });
-els.filterWarehouse.addEventListener('change', loadMonthYearOptions);
+if(els.filterWarehouse) els.filterWarehouse.addEventListener('change', loadMonthYearOptions);
 
 async function loadMonthYearOptions() {
   const params = new URLSearchParams();
-  if (els.filterLocation.value) params.set('location', els.filterLocation.value);
-  if (els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
+  if (els.filterLocation && els.filterLocation.value) params.set('location', els.filterLocation.value);
+  if (els.filterWarehouse && els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
 
   const now = new Date();
   const allMonths = new Set(Array.from({length: 12}, (_, i) => i + 1));
@@ -337,15 +440,15 @@ async function loadMonthYearOptions() {
     // Ignore failures; default month/year ranges are still usable.
   }
 
-  els.filterMonth.innerHTML = '<option value="">All months</option>' +
+  if(els.filterMonth) els.filterMonth.innerHTML = '<option value="">All months</option>' +
     [...allMonths].sort((a,b)=>a-b).map(m =>
       `<option value="${m}">${MONTH_NAMES[m]}</option>`).join('');
-  els.filterYear.innerHTML = '<option value="">All years</option>' +
+  if(els.filterYear) els.filterYear.innerHTML = '<option value="">All years</option>' +
     [...allYears].sort((a,b)=>a-b).map(y => `<option value="${y}">${y}</option>`).join('');
 }
 
 // ---- Upload parse ----
-els.parseBtn.addEventListener('click', async () => {
+if(els.parseBtn) els.parseBtn.addEventListener('click', async () => {
   const file = els.fileInput.files[0];
   if (!file) { els.uploadStatus.textContent = 'Choose a file first'; return; }
   els.uploadStatus.textContent = 'Parsing...';
@@ -360,7 +463,7 @@ els.parseBtn.addEventListener('click', async () => {
     renderSheetRows();
     els.assignPanel.style.display = 'block';
     els.uploadStatus.textContent = `Found ${pendingSheets.length} sheet(s) — assign warehouse below`;
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.uploadStatus.textContent = 'Parse failed: ' + err.message;
   }
 });
@@ -380,7 +483,7 @@ function renderSheetRows() {
     </tr>`;
   }).join('');
 }
-els.uploadLocation.addEventListener('change', () => {
+if(els.uploadLocation) els.uploadLocation.addEventListener('change', () => {
   pendingSheets = pendingSheets.map(s => ({ ...s, warehouse: '' }));
   renderSheetRows();
 });
@@ -391,7 +494,7 @@ window.__saveSheetWarehouse = (idx, value) => {
   }
 };
 
-els.confirmBtn.addEventListener('click', async () => {
+if(els.confirmBtn) els.confirmBtn.addEventListener('click', async () => {
   if (!pendingToken) return;
   const mapping = {};
   els.sheetsBody.querySelectorAll('select[data-sheet-index]').forEach(sel => {
@@ -416,27 +519,27 @@ els.confirmBtn.addEventListener('click', async () => {
     pendingToken = null;
     els.fileInput.value = '';
     loadMonthYearOptions();
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.uploadStatus.textContent = 'Load failed: ' + err.message;
   }
 });
 
 // ---- Browse / filter ----
-els.showDataBtn.addEventListener('click', loadData);
-els.generatePayrollBtn.addEventListener('click', generatePayroll);
+if(els.showDataBtn) els.showDataBtn.addEventListener('click', loadData);
+if(els.generatePayrollBtn) els.generatePayrollBtn.addEventListener('click', generatePayroll);
 
-document.getElementById('downloadPayrollBtn').addEventListener('click', () => {
+if (document.getElementById('downloadPayrollBtn')) document.getElementById('downloadPayrollBtn').addEventListener('click', () => {
   const month = els.filterMonth.value;
   const year = els.filterYear.value;
   if (!month || !year) {
-    alert('Please select Month and Year first.');
+    showToast('Please select Month and Year first.');
     return;
   }
   const params = new URLSearchParams();
   params.set('month', month);
   params.set('year', year);
-  if (els.filterLocation.value) params.set('location', els.filterLocation.value);
-  if (els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
+  if (els.filterLocation && els.filterLocation.value) params.set('location', els.filterLocation.value);
+  if (els.filterWarehouse && els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
   window.open('/payroll/download?' + params.toString(), '_blank');
 });
 
@@ -453,8 +556,8 @@ const NON_EDITABLE_COLUMNS = new Set([
 
 async function loadData() {
   const params = new URLSearchParams();
-  if (els.filterLocation.value)  params.set('location',  els.filterLocation.value);
-  if (els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
+  if (els.filterLocation && els.filterLocation.value)  params.set('location',  els.filterLocation.value);
+  if (els.filterWarehouse && els.filterWarehouse.value) params.set('warehouse', els.filterWarehouse.value);
   if (els.filterMonth.value)     params.set('month',     els.filterMonth.value);
   if (els.filterYear.value)      params.set('year',      els.filterYear.value);
   els.dataStatus.textContent = 'Loading...';
@@ -464,6 +567,7 @@ async function loadData() {
     const data = await res.json();
     currentColumns = data.columns;
     renderDataTable(data.columns, data.rows);
+    updateDashboardStats(params, data.rows);
     const monthYearSelected = Boolean(els.filterMonth.value && els.filterYear.value);
     if (!monthYearSelected) {
       els.dataStatus.textContent =
@@ -473,12 +577,14 @@ async function loadData() {
       els.dataStatus.textContent =
         `${data.rows.length} row(s) across ${data.collections.length} sheet(s)`;
     }
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.dataStatus.textContent = 'Load failed: ' + err.message;
   }
 }
 
 async function generatePayroll() {
+  showLoader('Generating Payroll...');
+
   if (!els.filterMonth.value || !els.filterYear.value) {
     els.generatePayrollStatus.style.color = 'red';
     els.generatePayrollStatus.textContent = 'Select Month and Year before generating payroll.';
@@ -489,8 +595,8 @@ async function generatePayroll() {
     month: Number(els.filterMonth.value),
     year: Number(els.filterYear.value),
   };
-  if (els.filterLocation.value) payload.location = els.filterLocation.value;
-  if (els.filterWarehouse.value) payload.warehouse = els.filterWarehouse.value;
+  if (els.filterLocation && els.filterLocation.value) payload.location = els.filterLocation.value;
+  if (els.filterWarehouse && els.filterWarehouse.value) payload.warehouse = els.filterWarehouse.value;
 
   els.generatePayrollStatus.style.color = 'green';
   els.generatePayrollStatus.textContent = 'Generating payroll...';
@@ -506,11 +612,46 @@ async function generatePayroll() {
     els.generatePayrollStatus.textContent =
       `Payroll generated: created ${data.created}, skipped ${data.skipped}`;
     loadMonthYearOptions();
-    loadData();
-  } catch (err) {
+    loadData(); hideLoader();
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.generatePayrollStatus.style.color = 'red';
     els.generatePayrollStatus.textContent = 'Generate failed: ' + err.message;
   }
+}
+
+async function updateDashboardStats(params, rows) {
+  try {
+    const empParams = new URLSearchParams();
+    if (params.get('location')) empParams.set('location', params.get('location'));
+    if (params.get('warehouse')) empParams.set('warehouse', params.get('warehouse'));
+    empParams.set('status', 'active');
+    
+    const res = await fetch('/employees?' + empParams.toString());
+    if (res.ok) {
+      const empData = await res.json();
+      document.getElementById('statEmp').textContent = empData.count || 0;
+    }
+  } catch (e) {
+    console.error("Failed to load total employees stat", e);
+  }
+
+  const month = params.get('month');
+  const year = params.get('year');
+  
+  let payrollsGenerated = 0;
+  let pendingPayslips = 0;
+
+  if (month && year) {
+    payrollsGenerated = rows.filter(r => r._collection === 'payroll_records').length;
+    pendingPayslips = rows.filter(r => r._collection === 'payroll_records' && !r['payslip.s3_key']).length;
+  } else {
+    // If no month is selected, we can count across all displayed payroll records
+    payrollsGenerated = rows.filter(r => r._collection === 'payroll_records').length;
+    pendingPayslips = rows.filter(r => r._collection === 'payroll_records' && !r['payslip.s3_key']).length;
+  }
+
+  document.getElementById('statPayroll').textContent = payrollsGenerated;
+  document.getElementById('statPending').textContent = pendingPayslips;
 }
 
 // ---- Render table ----
@@ -529,7 +670,7 @@ function renderDataTable(columns, rows) {
     { name: "Net Pay", cols: ["Net Pay"] }
   ];
 
-  let head1 = '<tr><th rowspan="2" class="sticky-col actions-col" style="z-index: 4; background: #fde047; color: #000; border: 1px solid #ddd; padding: 8px;">Actions</th>';
+  let head1 = '<tr><th rowspan="2" class="sticky-col actions-col group-header">Actions</th>';
   let head2 = '<tr>';
 
   const allColumns = [];
@@ -537,18 +678,18 @@ function renderDataTable(columns, rows) {
     const validCols = g.cols.filter(c => columns.includes(c) || c === "Employee Name" || c === "Mobile Number" || c === "emp_id");
     if (validCols.length === 0) return;
     
-    head1 += `<th colspan="${validCols.length}" style="background: #fde047; color: #000; border: 1px solid #ddd; padding: 8px; text-align:center;">${g.name}</th>`;
+    head1 += `<th colspan="${validCols.length}" class="group-header">${g.name}</th>`;
     
     validCols.forEach(c => {
       allColumns.push(c);
       let shortName = c.replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", "");
       
-      let extraClass = '';
+      let extraClass = 'sub-header';
       if(g.name === 'Employee Details') {
-          if (c === 'emp_id') extraClass = 'sticky-col emp-id-col';
-          if (c === 'Employee Name') extraClass = 'sticky-col emp-name-col';
+          if (c === 'emp_id') extraClass += ' sticky-col emp-id-col';
+          if (c === 'Employee Name') extraClass += ' sticky-col emp-name-col';
       }
-      head2 += `<th class="${extraClass}" style="background: #fde047; color: #000; border: 1px solid #ddd; padding: 8px;">${escapeHtml(shortName)}</th>`;
+      head2 += `<th class="${extraClass}">${escapeHtml(shortName)}</th>`;
     });
   });
   head1 += '</tr>';
@@ -562,26 +703,26 @@ function renderDataTable(columns, rows) {
     
     let actionButtons = '';
     if (editingRows[rowKey]) {
-        actionButtons += `<button class="btn-save" style="margin-right:2px;" onclick="saveRow('${escapeAttr(rowKey)}')">Save</button>`;
-        actionButtons += `<button class="btn-cancel" onclick="cancelEdit('${escapeAttr(rowKey)}')">Cancel</button>`;
+        actionButtons += `<button class="btn-icon save" title="Save" onclick="saveRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>`;
+        actionButtons += `<button class="btn-icon cancel" title="Cancel" onclick="cancelEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>`;
     } else {
         const editButton = monthYearSelected ?
-          `<button class="btn-edit" style="margin-right:2px;" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>` :
-          `<button class="btn-edit" disabled title="Select Month and Year to edit salary records" style="margin-right:2px;">Edit</button>`;
+          `<button class="btn-icon edit" title="Edit" onclick="startEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` :
+          `<button class="btn-icon edit" disabled title="Select Month and Year to edit"><svg width="16" height="16" opacity="0.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>`;
         
-        const deleteButton = `<button class="btn-cancel" style="background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2);" onclick="deleteEmployeeRow('${escapeAttr(rowKey)}')">Delete</button>`;
+        const deleteButton = `<button class="btn-icon delete" title="Delete" onclick="deleteEmployeeRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
         
         actionButtons += editButton + deleteButton;
         
         if (r._collection === 'payroll_records' && r._id) {
-            actionButtons += `<br><button class="btn-pdf" style="margin-top:2px; margin-right:2px;" onclick="generatePayslip('${r._id}')">Generate</button>`;
-            actionButtons += `<button class="btn-pdf" style="margin-top:2px; margin-right:2px;" onclick="downloadPayslip('${r._id}')">Download</button>`;
-            actionButtons += `<button class="btn-pdf" style="margin-top:2px;" onclick="sendWhatsApp('${r._id}')">WA</button>`;
+            actionButtons += `<button class="btn-icon generate" title="Generate Payslip" onclick="generatePayslip('${r._id}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg></button>`;
+            actionButtons += `<button class="btn-icon download" title="Download Payslip" onclick="downloadPayslip('${r._id}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>`;
+            actionButtons += `<button class="btn-icon wa" title="Send WhatsApp" onclick="sendWhatsApp('${r._id}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>`;
         }
     }
 
     let tr = `<tr data-collection="${escapeAttr(r._collection)}" data-row-id="${r._row_id}" data-obj-id="${r._id || ''}" data-row-key="${escapeAttr(rowKey)}">
-      <td class="sticky-col actions-col" style="background: #fff; color: #000; z-index: 3;">${actionButtons}</td>`;
+      <td class="sticky-col actions-col cell-actions">${actionButtons}</td>`;
 
     allColumns.forEach(c => {
       let val = r[c] ?? '';
@@ -591,112 +732,63 @@ function renderDataTable(columns, rows) {
       if (isNumeric) totals[c] += parseFloat(val);
       
       let extraClass = isNumeric ? 'numeric' : '';
-      let inlineStyle = '';
-      if (c === 'emp_id') {
-          extraClass += ' sticky-col emp-id-col';
-          inlineStyle = 'background: #fff; color: #000; z-index: 2;';
-      }
-      if (c === 'Employee Name') {
-          extraClass += ' sticky-col emp-name-col';
-          inlineStyle = 'background: #fff; color: #000; z-index: 2;';
-      }
+      if (c === 'emp_id') extraClass += ' sticky-col emp-id-col';
+      if (c === 'Employee Name') extraClass += ' sticky-col emp-name-col';
       
       if (editingRows[rowKey] && !NON_EDITABLE_COLUMNS.has(c) && c !== 'emp_id' && c !== 'Employee Name') {
-          tr += `<td class="${extraClass.trim()}" style="${inlineStyle}">
+          tr += `<td class="${extraClass.trim()}">
                    <input type="text" class="cell-input" data-col="${escapeAttr(c)}" value="${escapeHtml(val)}" />
                  </td>`;
       } else {
-          tr += `<td data-col="${escapeAttr(c)}" class="${extraClass.trim()}" style="${inlineStyle}">${escapeHtml(val)}</td>`;
+          tr += `<td data-col="${escapeAttr(c)}" class="${extraClass.trim()}">${escapeHtml(val)}</td>`;
       }
     });
     tr += '</tr>';
     return tr;
   }).join('') + '</tbody>';
 
-  let foot = '<tfoot><tr><th class="sticky-col actions-col" style="z-index: 4; background: #fde047; color: #000; padding: 8px;">GRAND TOTAL</th>';
+  let foot = '<tfoot><tr><th class="sticky-col actions-col foot-header">GRAND TOTAL</th>';
   allColumns.forEach(c => {
-    let extraClass = '';
-    let inlineStyle = 'background: #fde047; color: #000; padding: 8px;';
-    if (c === 'emp_id') {
-        extraClass = 'sticky-col emp-id-col';
-    }
-    if (c === 'Employee Name') {
-        extraClass = 'sticky-col emp-name-col';
-    }
+    let extraClass = 'foot-header';
+    if (c === 'emp_id') extraClass += ' sticky-col emp-id-col';
+    if (c === 'Employee Name') extraClass += ' sticky-col emp-name-col';
     
-    // Only show total for non-Employee Details columns
     let isEmpDetail = COLUMN_GROUPS[0].cols.includes(c);
     let val = isEmpDetail ? '' : (totals[c] ? totals[c].toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : '0');
-    foot += `<th class="${extraClass}" style="${inlineStyle} ${!isEmpDetail ? 'text-align:right;' : ''}">${val}</th>`;
+    foot += `<th class="${extraClass.trim()}" style="${!isEmpDetail ? 'text-align:right;' : ''}">${val}</th>`;
   });
   foot += '</tr></tfoot>';
 
   els.dataTable.innerHTML = '<thead>' + head1 + head2 + '</thead>' + body + foot;
+  
+  if (!rows || rows.length === 0) {
+      document.getElementById('emptyState').style.display = 'flex';
+      document.getElementById('tableWrap').style.display = 'none';
+  } else {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('tableWrap').style.display = 'block';
+  }
 }
-
-// ---- Calculation Log Panel ----
-function showLog(lines) {
-  const panel = document.getElementById('calcLogPanel');
-  const body  = document.getElementById('calcLogBody');
-  body.textContent = lines.join('\n');
-  panel.classList.add('open');
-  body.scrollTop = 0;
-}
-function closeLog() {
-  document.getElementById('calcLogPanel').classList.remove('open');
-}
-function clearLog() {
-  document.getElementById('calcLogBody').textContent = '';
-}
-
-// toggle panel collapse on header click
-document.getElementById('calcLogHeader').addEventListener('click', e => {
-  if (e.target.tagName === 'BUTTON') return;
-  const body = document.getElementById('calcLogBody');
-  body.style.display = body.style.display === 'none' ? '' : 'none';
-});
-
-// ---- Edit mode ----
 function startEdit(rowKey) {
   const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
   if (!tr) return;
 
-  // swap edit button for save+cancel
   const actionTd = tr.querySelector('td:first-child');
   actionTd.innerHTML =
-    `<button class="btn-save" onclick="saveRow('${escapeAttr(rowKey)}')">Save</button>` +
-    `<button class="btn-cancel" style="margin-left:4px;" onclick="cancelEdit('${escapeAttr(rowKey)}')">Cancel</button>`;
-
-  // make each data cell editable, except attendance totals that are derived from attendance input
-  const originals = {};
-  tr.querySelectorAll('td[data-col]').forEach(td => {
-    const col = td.dataset.col;
-    const val = td.textContent;
-    originals[col] = val;
-    if (NON_EDITABLE_COLUMNS.has(col)) {
-      td.innerHTML = `<span style="color:#555;">${escapeHtml(val)}</span>`;
-    } else {
-      td.innerHTML = `<input class="cell-input" type="text" data-col="${escapeAttr(col)}" value="${escapeAttr(val)}">`;
+    `<button class="btn-icon save" title="Save" onclick="saveRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>` +
+    `<button class="btn-icon cancel" title="Cancel" onclick="cancelEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>`;
+  
+  editingRows[rowKey] = {};
+  const tds = tr.querySelectorAll('td[data-col]');
+  tds.forEach(td => {
+    const col = td.getAttribute('data-col');
+    if (!NON_EDITABLE_COLUMNS.has(col) && col !== 'emp_id' && col !== 'Employee Name') {
+      const val = td.textContent;
+      editingRows[rowKey][col] = val;
+      td.innerHTML = `<input type="text" class="cell-input" data-col="${escapeAttr(col)}" value="${escapeHtml(val)}" />`;
     }
   });
-  editingRows[rowKey] = originals;
 }
-
-function cancelEdit(rowKey) {
-  const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
-  if (!tr) return;
-  const originals = editingRows[rowKey] || {};
-
-  tr.querySelector('td:first-child').innerHTML =
-    `<button class="btn-edit" onclick="startEdit('${escapeAttr(rowKey)}')">Edit</button>`;
-
-  tr.querySelectorAll('td[data-col]').forEach(td => {
-    const col = td.dataset.col;
-    td.innerHTML = escapeHtml(originals[col] ?? '');
-  });
-  delete editingRows[rowKey];
-}
-
 async function saveRow(rowKey) {
   const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
   if (!tr) return;
@@ -720,56 +812,58 @@ async function saveRow(rowKey) {
 
     // show calculation log
     if (data.calc_log && data.calc_log.length) {
-      showLog(data.calc_log);
+      console.log("Calculation log:", data.calc_log);
     }
 
     delete editingRows[rowKey];
     // update cells by reloading data to preserve all action buttons properly
     const st = els.dataTable.parentElement.scrollTop;
-    await loadData();
+    await loadData(); hideLoader();
     els.dataTable.parentElement.scrollTop = st;
     els.dataStatus.textContent = 'Saved \u2713';
     setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.dataStatus.textContent = 'Save failed: ' + err.message;
   }
 }
 
 async function downloadPayslip(id) {
+  showLoader('Downloading Payslip...');
   window.open(`/payroll/${id}/download_payslip`, '_blank');
+  setTimeout(hideLoader, 2000);
 }
 
-document.getElementById('btnGenerateAll')?.addEventListener('click', async () => {
+if (document.getElementById('btnGenerateAll')) document.getElementById('btnGenerateAll').addEventListener('click', async () => {
   els.dataStatus.textContent = 'Generating all payslips...';
   try {
     const res = await fetch('/payroll/generate_all', { method: 'POST' });
     if (!res.ok) throw new Error(await res.text());
     els.dataStatus.textContent = 'Generated All Payslips Successfully ?';
-    setTimeout(() => { els.dataStatus.textContent = ''; loadData(); }, 2000);
+    setTimeout(() => { els.dataStatus.textContent = ''; loadData(); hideLoader(); }, 2000);
   } catch(err) {
     els.dataStatus.textContent = 'Error: ' + err.message;
   }
 });
 
-document.getElementById('btnWaAll')?.addEventListener('click', async () => {
+if (document.getElementById('btnWaAll')) document.getElementById('btnWaAll').addEventListener('click', async () => {
   els.dataStatus.textContent = 'Sending all WhatsApp messages...';
   try {
     const res = await fetch('/payroll/send_whatsapp_all', { method: 'POST' });
     if (!res.ok) throw new Error(await res.text());
     els.dataStatus.textContent = 'Sent All WhatsApp Messages ?';
-    setTimeout(() => { els.dataStatus.textContent = ''; loadData(); }, 2000);
+    setTimeout(() => { els.dataStatus.textContent = ''; loadData(); hideLoader(); }, 2000);
   } catch(err) {
     els.dataStatus.textContent = 'Error: ' + err.message;
   }
 });
 
-document.getElementById('btnDownloadAll')?.addEventListener('click', () => {
-  const loc = els.filterLocation.value;
+if (document.getElementById('btnDownloadAll')) document.getElementById('btnDownloadAll').addEventListener('click', () => {
+  const loc = els.filterLocation ? els.filterLocation.value : '';
   const wh = els.filterWarehouse.value;
   const mo = els.filterMonth.value;
   const yr = els.filterYear.value;
   if(!mo || !yr) {
-    alert("Please select Month and Year");
+    showToast("Please select Month and Year");
     return;
   }
   let url = `/payroll/download_all?month=${mo}&year=${yr}`;
@@ -779,24 +873,28 @@ document.getElementById('btnDownloadAll')?.addEventListener('click', () => {
 });
 
 async function generatePayslip(payrollId) {
+  showLoader('Generating Payslip...');
+
   els.dataStatus.textContent = 'Generating PDF...';
   try {
     const res = await fetch(`/payroll/${payrollId}/generate_payslip`, { method: 'POST' });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
     els.dataStatus.textContent = 'PDF Generated successfully: ' + data.payslip.file_name;
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.dataStatus.textContent = 'PDF Error: ' + err.message;
   }
 }
 
 async function sendWhatsApp(payrollId) {
+  showLoader('Sending WhatsApp...');
+
   els.dataStatus.textContent = 'Sending WhatsApp...';
   try {
     const res = await fetch(`/payroll/${payrollId}/send_whatsapp`, { method: 'POST' });
     if (!res.ok) throw new Error(await res.text());
     els.dataStatus.textContent = 'WhatsApp Sent successfully!';
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.dataStatus.textContent = 'WhatsApp Error: ' + err.message;
   }
 }
@@ -828,11 +926,11 @@ async function recalculateRow(rowKey) {
       td.innerHTML = escapeHtml(updated[col] ?? '');
     });
     if (data.calc_log && data.calc_log.length) {
-      showLog(data.calc_log);
+      console.log("Calculation log:", data.calc_log);
     }
     els.dataStatus.textContent = 'Recalculated ';
     setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.dataStatus.textContent = 'Recalc failed: ' + err.message;
   }
 }
@@ -842,10 +940,10 @@ async function deleteEmployeeRow(rowKey) {
   if (!tr) return;
   const row = getRowData(tr);
   const empId = row.emp_id || row['EMP_ID'] || row['Emp Id'];
-  const location = row.location || row.Location || tr.querySelector('td[data-col="location"]')?.textContent || '';
-  const warehouse = row.warehouse || row.Warehouse || tr.querySelector('td[data-col="warehouse"]')?.textContent || '';
+  const location = row.location || row.Location || (tr.querySelector('td[data-col="location"]') ? tr.querySelector('td[data-col="location"]').textContent : '');
+  const warehouse = row.warehouse || row.Warehouse || (tr.querySelector('td[data-col="warehouse"]') ? tr.querySelector('td[data-col="warehouse"]').textContent : '');
   if (!empId || !location || !warehouse) {
-    alert('Cannot delete employee: missing emp_id, location or warehouse');
+    showToast('Cannot delete employee: missing emp_id, location or warehouse');
     return;
   }
   if (!confirm(`Delete employee ${empId} from ${location}/${warehouse} for all months? This cannot be undone.`)) {
@@ -858,17 +956,17 @@ async function deleteEmployeeRow(rowKey) {
       { method: 'DELETE' }
     );
     if (!res.ok) throw new Error(await res.text());
-    await loadData();
+    await loadData(); hideLoader();
     els.dataStatus.textContent = `Deleted ${empId} `;
     setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.dataStatus.textContent = 'Delete failed: ' + err.message;
   }
 }
 
 // ---- Add Employee modal ----
 if (els.addEmpBtn) {
-  els.addEmpBtn.addEventListener('click', async () => {
+  if(els.addEmpBtn) els.addEmpBtn.addEventListener('click', async () => {
     const res = await fetch('/collections');
     const data = await res.json();
     els.empCollection.innerHTML = data.collections.map(c =>
@@ -894,12 +992,12 @@ if (els.addEmpBtn) {
   });
 }
 
-els.empCancelBtn.addEventListener('click', () => els.empModal.classList.remove('open'));
-els.empModal.addEventListener('click', e => {
+if(els.empCancelBtn) els.empCancelBtn.addEventListener('click', () => els.empModal.classList.remove('open'));
+if(els.empModal) els.empModal.addEventListener('click', e => {
   if (e.target === els.empModal) els.empModal.classList.remove('open');
 });
 
-els.empSaveBtn.addEventListener('click', async () => {
+if(els.empSaveBtn) els.empSaveBtn.addEventListener('click', async () => {
   const targetCollection = els.empCollection.value;
   if (!targetCollection) {
     els.empFormStatus.style.color = 'red';
@@ -921,9 +1019,9 @@ els.empSaveBtn.addEventListener('click', async () => {
     els.empFormStatus.textContent = 'Employee added \u2713';
     setTimeout(() => {
       els.empModal.classList.remove('open');
-      loadData();
+      loadData(); hideLoader();
     }, 900);
-  } catch (err) {
+  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
     els.empFormStatus.style.color = 'red';
     els.empFormStatus.textContent = 'Save failed: ' + err.message;
   }
@@ -990,6 +1088,77 @@ async function saveSettings() {
 }
 
 loadWarehouses().then(loadMonthYearOptions);
+loadSettings();
+
+
+// Toasts and Loader functions
+  function showToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    let icon = '';
+    if(type === 'success') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+    if(type === 'error') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+    if(type === 'warning') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+    
+    toast.innerHTML = `${icon}<span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  function showLoader(text) {
+    const loader = document.getElementById('globalLoader');
+    if(loader) {
+      document.getElementById('loaderText').textContent = text || 'Processing...';
+      loader.style.display = 'flex';
+    }
+  }
+  
+  function hideLoader() {
+    const loader = document.getElementById('globalLoader');
+    if(loader) loader.style.display = 'none';
+  }
+  
+  if(document.getElementById('logoutBtn')) document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('rs_auth');
+    window.location.href = '/login.html';
+  });
+  
+  // Set Date
+  const dateObj = new Date();
+  document.getElementById('statDate').textContent = dateObj.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+
+  // Aggressively prevent swipe-to-go-back trackpad gesture
+  window.addEventListener('wheel', (e) => {
+      // If it is a horizontal scroll
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+          let container = e.target.closest('.table-wrap');
+          if (!container) {
+              e.preventDefault();
+              return;
+          }
+          // Prevent if scrolling left at the very left edge
+          if (e.deltaX < 0 && container.scrollLeft <= 0) {
+              e.preventDefault();
+          }
+          // Prevent if scrolling right at the very right edge
+          if (e.deltaX > 0 && container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+              e.preventDefault();
+          }
+      }
+  }, { passive: false });
 </script>
+
 </body>
+
 </html>

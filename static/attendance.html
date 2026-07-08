@@ -1,183 +1,233 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
+<meta charset="utf-8">
+<title>Attendance | Payroll Management System</title>
 <script>
   if (localStorage.getItem('rs_auth') !== 'authenticated') {
     window.location.href = '/login.html';
   }
 </script>
-<meta charset="utf-8">
-<title>Attendance Module</title>
 <style>
-  * { box-sizing: border-box; transition: all 0.2s ease; }
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: linear-gradient(135deg, #0b0f19 0%, #111827 100%);
-    color: #f3f4f6;
-    margin: 0;
-    padding: 24px;
-    min-height: 100vh;
-  }
-  h2 {
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-weight: 700;
-    margin-top: 0;
-    margin-bottom: 4px;
-  }
-  nav {
-    background: rgba(31, 41, 55, 0.6);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 12px 20px;
-    margin-bottom: 24px;
-    display: flex;
-    gap: 20px;
-  }
-  nav a {
-    color: #9ca3af;
-    text-decoration: none;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  nav a:hover {
-    color: #60a5fa;
-    text-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
-  }
-  section {
-    background: rgba(17, 24, 39, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  }
-  section h3 { margin-top: 0; color: #9ca3af; font-size: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
-  .filter-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-  .filter-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #9ca3af; }
-  
-  select, input, button {
-    background: rgba(17, 24, 39, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #f3f4f6;
-    padding: 6px 12px;
-    border-radius: 8px;
-    outline: none;
-    font-size: 13px;
-  }
-  select:focus, input:focus {
-    border-color: #60a5fa;
+  :root {
+    --bg-color: #f4f7fb;
+    --surface: #ffffff;
+    --border: #dbe4ee;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-light: #eff6ff;
+    --success: #16a34a;
+    --warning: #f59e0b;
+    --danger: #dc2626;
+    --text: #1f2937;
+    --text-muted: #6b7280;
+    --nav-bg: #1e293b;
+    --nav-text: #f8fafc;
   }
   
-  .att-wrap { overflow-x: auto; margin-top: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); }
-  table.att { border-collapse: collapse; font-size: 12px; min-width: 100%; background: rgba(31, 41, 55, 0.3); }
-  table.att th, table.att td { border: 1px solid rgba(255,255,255,0.05); padding: 6px 8px; white-space: nowrap; text-align: center; }
-  table.att th { background: #0f172a; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-  table.att td.emp-info { text-align: left; background: #0f172a; color: #f3f4f6; position: sticky; left: 0; z-index: 1; min-width: 130px; border-right: 2px solid rgba(255,255,255,0.15); }
-  table.att td.summary { background: rgba(59, 130, 246, 0.1); color: #60a5fa; font-weight: 600; }
-  table.att td.summary.absent { background: rgba(239, 68, 68, 0.1); color: #f87171; }
-
-  table.att input.day-inp {
-    width: 34px; text-align: center; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
-    padding: 4px; font-size: 11px; text-transform: uppercase; color: #000; font-weight: bold;
-  }
-  table.att input.day-inp.status-p  { background: #10b981; color: #ffffff; } /* Green */
-  table.att input.day-inp.status-wo { background: #3b82f6; color: #ffffff; } /* Blue */
-  table.att input.day-inp.status-h  { background: #f97316; color: #ffffff; } /* Orange */
-  table.att input.day-inp.status-cl { background: #8b5cf6; color: #ffffff; } /* Purple */
-  table.att input.day-inp.status-sl { background: #14b8a6; color: #ffffff; } /* Teal */
-  table.att input.day-inp.status-pl { background: #047857; color: #ffffff; } /* Dark Green */
-  table.att input.day-inp.status-hl { background: #eab308; color: #ffffff; } /* Yellow */
-  table.att input.day-inp.status-a  { background: #ef4444; color: #ffffff; } /* Red */
-  table.att input.day-inp.status-blank { background: rgba(17, 24, 39, 0.8); color: #f3f4f6; }
-
-  th.weekend { background: rgba(59, 130, 246, 0.15) !important; }
-  td.weekend input.status-blank { background: rgba(59, 130, 246, 0.08); color: #f3f4f6; }
+  * { box-sizing: border-box; transition: all 0.2s ease; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  body { background: var(--bg-color); color: var(--text); margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; }
   
-  th.next-cycle, td.next-cycle { opacity: 0.6; border-left: 2px dashed rgba(255,255,255,0.2) !important; }
-  th.next-cycle { background: rgba(0,0,0,0.3); }
+  /* Enterprise Navigation */
+  .top-nav { background: var(--nav-bg); padding: 0 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; height: 60px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  .nav-left { display: flex; align-items: center; gap: 16px; height: 100%; }
+  .logo-text { font-size: 16px; font-weight: 600; color: var(--nav-text); letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }
+  .nav-center { display: flex; gap: 4px; height: 100%; }
+  .nav-link { color: #94a3b8; text-decoration: none; font-weight: 500; font-size: 14px; padding: 0 16px; display: flex; align-items: center; height: 100%; border-bottom: 2px solid transparent; }
+  .nav-link:hover { color: var(--nav-text); background: rgba(255,255,255,0.05); }
+  .nav-link.active { color: var(--nav-text); border-bottom-color: #60a5fa; background: rgba(255,255,255,0.05); }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .user-profile { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--nav-text); }
   
-  th.th-abm { background: rgba(224, 231, 255, 0.8) !important; color: #3730a3 !important; }
-  th.th-acm { background: rgba(220, 252, 231, 0.8) !important; color: #166534 !important; }
-  td.td-abm { background: rgba(224, 231, 255, 0.05); }
-  td.td-acm { background: rgba(220, 252, 231, 0.05); }
-
-  .btn-primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; }
-  .btn-save-all { background: linear-gradient(135deg, #059669, #047857); color: white; border: none; font-weight: 600; }
-  .btn-att-save { background: rgba(5, 150, 105, 0.1); color: #34d399; border: 1px solid rgba(5, 150, 105, 0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
-  .btn-att-save:hover { background: #059669; color: white; }
-  .btn-att-delete { background: rgba(239, 68, 68, 0.1); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
-  .btn-att-delete:hover { background: #ef4444; color: white; }
+  .container { padding: 24px; max-width: 100vw; display: flex; flex-direction: column; gap: 24px; }
   
-  #attStatus { font-size: 13px; margin-left: 12px; color: #34d399; }
-  .legend { font-size: 12px; color: #9ca3af; margin-top: 8px; }
-  .legend span { display: inline-block; margin-right: 12px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
-  .leg-p  { background: #a7f3d0; color: #065f46; }
-  .leg-sl { background: #fde68a; color: #92400e; }
-  .leg-pl { background: #fbcfe8; color: #9d174d; }
-  .leg-hp { background: #bfdbfe; color: #1e40af; }
-  .leg-hl { background: #d8b4fe; color: #581c87; }
-  .leg-wo { background: #67e8f9; color: #083344; }
-  .leg-co { background: #bbf7d0; color: #14532d; }
-  .leg-a  { background: #fca5a5; color: #991b1b; }
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .card h3 { margin: 0 0 20px 0; font-size: 16px; color: var(--text); font-weight: 600; }
+  
+  /* Forms */
+  .filter-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .filter-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 150px; max-width: 250px; }
+  label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  select, input[type="text"], input[type="file"], input[type="number"] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; outline: none; font-size: 14px; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
+  select:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+  
+  /* Buttons */
+  button { font-weight: 500; cursor: pointer; border: 1px solid transparent; padding: 8px 16px; border-radius: 6px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; justify-content: center; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  button:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+  button:active { transform: translateY(0); }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-success { background: var(--success); color: white; }
+  .btn-warning { background: var(--warning); color: white; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-outline { background: var(--surface); border-color: var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg-color); }
+  .btn-nav { background: transparent; border: none; color: #94a3b8; box-shadow: none; padding: 6px; border-radius: 4px; }
+  .btn-nav:hover { background: rgba(255,255,255,0.1); color: white; box-shadow: none; }
+  
+  .action-toolbar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-start; margin-bottom: 20px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+  
+  /* Legend Sticky */
+  .legend-bar { background: var(--surface); padding: 12px 24px; border-bottom: 1px solid var(--border); display: flex; gap: 16px; align-items: center; justify-content: center; flex-wrap: wrap; font-size: 13px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-weight: 500; color: var(--text-muted); }
+  .legend-color { width: 12px; height: 12px; border-radius: 2px; }
+  
+  .legend-p { background: var(--success); }
+  .legend-wo { background: var(--primary); }
+  .legend-hl { background: var(--warning); }
+  .legend-sl { background: #eab308; }
+  .legend-pl { background: #9333ea; }
+  .legend-a { background: var(--danger); }
+  
+  /* Enterprise Table */
+  .att-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); max-height: 65vh; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  table.att { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-size: 13px; }
+  table.att th, table.att td { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 12px; white-space: nowrap; text-align: center; color: var(--text); }
+  
+  /* Sticky Headers */
+  table.att th { position: sticky; top: 0; z-index: 10; font-weight: 600; background: #f8fafc; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-bottom: 2px solid var(--border); }
+  
+  /* Sticky Columns */
+  table.att td.emp-info { position: sticky; left: 0; z-index: 11; background: var(--surface); text-align: left; min-width: 150px; border-right: 2px solid var(--border); font-weight: 500; box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  table.att th.emp-info-th { position: sticky; left: 0; z-index: 12; background: #f8fafc; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  
+  /* Attendance Status Colors */
+  table.att input.day-inp { width: 36px; height: 36px; text-align: center; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; text-transform: uppercase; font-weight: 600; background: var(--surface); color: var(--text); padding: 0; display: inline-flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
+  table.att input.day-inp:focus { box-shadow: 0 0 0 3px var(--primary-light); border-color: var(--primary); }
+  
+  table.att input.day-inp.status-p  { background: var(--success); color: white; border-color: transparent; }
+  table.att input.day-inp.status-wo { background: var(--primary); color: white; border-color: transparent; }
+  table.att input.day-inp.status-h  { background: var(--warning); color: white; border-color: transparent; }
+  table.att input.day-inp.status-hl { background: var(--warning); color: white; border-color: transparent; }
+  table.att input.day-inp.status-sl { background: #eab308; color: white; border-color: transparent; }
+  table.att input.day-inp.status-pl { background: #9333ea; color: white; border-color: transparent; }
+  table.att input.day-inp.status-cl { background: #9333ea; color: white; border-color: transparent; }
+  table.att input.day-inp.status-a  { background: var(--danger); color: white; border-color: transparent; }
+  
+  table.att td.summary { background: #f9fafb; font-weight: 600; }
+  
+  th.weekend { background: #eff6ff !important; color: var(--primary) !important; }
+  td.weekend input.status-blank { background: #f8fafc; }
+  th.next-cycle, td.next-cycle { opacity: 0.5; border-right: 2px dashed var(--border) !important; }
+  
+  th.th-abm { background: #f1f5f9 !important; }
+  th.th-acm { background: #f8fafc !important; }
+  
+  /* Icon Buttons in Table */
+  .btn-icon { padding: 6px; border-radius: 4px; background: transparent; color: var(--text-muted); border: 1px solid transparent; box-shadow: none; display: inline-flex; }
+  .btn-icon:hover { background: var(--border); color: var(--text); box-shadow: none; transform: none; }
+  .btn-icon.save { color: var(--success); }
+  .btn-icon.save:hover { background: #dcfce7; }
+  .btn-icon.delete:hover { color: var(--danger); background: #fee2e2; }
+  
+  /* Empty State */
+  .empty-state { padding: 80px 20px; text-align: center; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 16px; background: var(--surface); border: 1px dashed var(--border); border-radius: 8px; }
+  .empty-state svg { width: 64px; height: 64px; opacity: 0.3; color: var(--primary); }
+  .empty-state h4 { margin: 0; font-size: 18px; color: var(--text); font-weight: 600; }
+  .empty-state p { margin: 0; font-size: 14px; }
+  
+  /* Toasts */
+  #toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 12px; z-index: 9999; }
+  .toast { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 14px 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); border-left: 4px solid transparent; }
+  .toast.success { border-left-color: var(--success); }
+  .toast.error { border-left-color: var(--danger); }
+  .toast.warning { border-left-color: var(--warning); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  
+  /* Loader Overlay */
+  .loader-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--text); font-weight: 600; }
+  .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-left-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
 
-<nav>
-  <a href="/" style="color: #9ca3af;">&#127968; Salary Sheet</a>
-  <a href="/attendance.html" style="color:#60a5fa; text-shadow: 0 0 10px rgba(96, 165, 250, 0.4); font-weight: 600;">&#128197; Attendance</a>
-  <a href="/add_employee.html" style="color: #9ca3af;">&#10133; Add Employee</a>
+<nav class="top-nav">
+  <div class="nav-left">
+    <div class="logo-text">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+      Payroll Management System
+    </div>
+  </div>
+  <div class="nav-center">
+    <a href="/" class="nav-link">Salary</a>
+    <a href="/attendance.html" class="nav-link active">Attendance</a>
+    <a href="/add_employee.html" class="nav-link">Employees</a>
+  </div>
+  <div class="nav-right">
+    <div class="user-profile">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      Admin
+    </div>
+    <button id="logoutBtn" class="btn-nav" title="Logout">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+    </button>
+  </div>
 </nav>
 
-<h2>&#128197; Attendance Module</h2>
+<div class="legend-bar">
+  <div class="legend-item"><div class="legend-color legend-p"></div> Present</div>
+  <div class="legend-item"><div class="legend-color legend-wo"></div> Week Off</div>
+  <div class="legend-item"><div class="legend-color legend-hl"></div> Half Leave</div>
+  <div class="legend-item"><div class="legend-color legend-sl"></div> Sick Leave</div>
+  <div class="legend-item"><div class="legend-color legend-pl"></div> Privilege Leave</div>
+  <div class="legend-item"><div class="legend-color legend-a"></div> Absent</div>
+</div>
 
-<section>
-  <h3>Filters</h3>
-  <div class="filter-row">
-    <label>Location:
-      <select id="attLocation" style="min-width:140px;"><option value="">Select</option></select>
-    </label>
-    <label>Warehouse:
-      <select id="attWarehouse" style="min-width:140px;"><option value="">Select</option></select>
-    </label>
-    <label>Month:
-      <select id="attMonth" style="min-width:120px;"></select>
-    </label>
-    <label>Year:
-      <select id="attYear" style="min-width:90px;"></select>
-    </label>
-    <button class="btn-primary" onclick="loadAttendance()">Load Employees</button>
-    <button id="downloadAttendanceBtn" style="margin-left:8px; background:#e65100; color:#fff; border:none; border-radius:4px; padding:5px 14px; cursor:pointer;" onclick="downloadAttendanceExcel()">Download Attendance (Excel)</button>
-  </div>
-  <div class="legend" style="margin-top:10px;">
-    <span class="leg-p">P = Present</span>
-    <span class="leg-sl">SL = Sick Leave</span>
-    <span class="leg-pl">PL = Paid Leave</span>
-    <span class="leg-hp">HP = Holiday Present</span>
-    <span class="leg-hl">HL = Half Leave</span>
-    <span class="leg-co">CO = Comp Off</span>
-    <span class="leg-wo">WO = Week Off</span>
-    <span class="leg-a">A = Absent</span>
-    <em style="font-size:12px;">P, HP, SL, PL, CO, WO count as 1 paid day. HL counts as 0.5. CO counts as present.</em>
-  </div>
-</section>
+<div class="loader-overlay" id="globalLoader">
+  <div class="spinner"></div>
+  <span id="loaderText">Processing...</span>
+</div>
 
-<section id="attSection" style="display:none;">
-  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px;">
-    <h3 style="margin:0;" id="attTitle">Attendance</h3>
-    <button class="btn-save-all" onclick="saveAllAttendance()">&#128190; Save All</button>
-    <span id="attStatus"></span>
+<div class="container">
+  <div class="card" style="padding-bottom: 0;">
+    <h3>Attendance Dashboard</h3>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>Location</label>
+        <select id="attLocation"><option value="">Select</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Warehouse</label>
+        <select id="attWarehouse"><option value="">Select</option></select>
+      </div>
+      <div class="filter-group">
+        <label>Month</label>
+        <select id="attMonth"></select>
+      </div>
+      <div class="filter-group">
+        <label>Year</label>
+        <select id="attYear"></select>
+      </div>
+      <button id="attShowBtn" class="btn-primary" style="height: 38px;" onclick="loadAttendance()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        Show Data
+      </button>
+    </div>
+    
+    <div class="action-toolbar">
+      <button id="attSaveAllBtn" class="btn-success" onclick="saveAllAttendance()">Save All Changes</button>
+      <button id="attProcessBtn" class="btn-primary" onclick="downloadAttendanceExcel()">Download Attendance</button>
+      <span class="status" id="attStatus" style="font-size:13px; color:var(--success); margin-left:8px; line-height:38px;"></span>
+    </div>
   </div>
-  <div class="att-wrap">
+
+  <div id="emptyState" class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+    <div>
+      <h4>No attendance data loaded</h4>
+      <p>Select location, warehouse, and month, then click Show Data.</p>
+    </div>
+  </div>
+  
+  <h4 id="attTitle" style="margin-bottom: 12px;"></h4>
+  <div class="att-wrap" id="attSection" style="display:none;">
+  <div id="tableWrap">
     <table class="att" id="attTable"></table>
   </div>
-</section>
+  </div>
+</div>
 
 <script>
 const MONTH_NAMES = ["","January","February","March","April","May","June",
@@ -263,7 +313,7 @@ async function loadAttendance() {
   currentYear      = parseInt(document.getElementById('attYear').value);
 
   if (!currentLocation || !currentWarehouse) {
-    alert('Please select both Location and Warehouse.');
+    showToast('Please select both Location and Warehouse.');
     return;
   }
 
@@ -273,15 +323,23 @@ async function loadAttendance() {
   });
 
   const res  = await fetch('/attendance/employees?' + params.toString());
-  if (!res.ok) { alert('Failed to load employees: ' + await res.text()); return; }
+  if (!res.ok) { showToast('Failed to load employees: ' + await res.text()); return; }
   const data = await res.json();
   currentPolicy = data.policy || {};
 
   currentPeriodDates = getPayrollPeriodDates(currentMonth, currentYear);
   document.getElementById('attTitle').textContent =
     `${MONTH_NAMES[currentMonth]} ${currentYear} — ${currentLocation} / ${currentWarehouse}`;
-  document.getElementById('attSection').style.display = '';
-  renderTable(data.employees);
+  
+  if (data.employees && data.employees.length > 0) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('attSection').style.display = '';
+    renderTable(data.employees);
+  } else {
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('attSection').style.display = 'none';
+    showToast('No employees found for this selection.', 'warning');
+  }
 }
 
 function renderTable(employees) {
@@ -388,7 +446,7 @@ function renderTable(employees) {
       const valid = Object.keys(currentPolicy);
       const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : 'status-blank';
       dayCells += `<td${classAttr}><input class="day-inp ${cls}" type="text" maxlength="2"`
-            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)"${disabledAttr}></td>`;
+            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)" onkeydown="onDayKeyDown(event, this)"${disabledAttr}></td>`;
             
       const v = val.toLowerCase();
       // Initial render doesn't compute working/present; we'll recalculate exactly at the end
@@ -476,6 +534,58 @@ function onDayInput(inp) {
   tr.querySelector('[data-type="lop"]').textContent     = lop;
   tr.querySelector('[data-type="abm"]').textContent     = abmTotal;
   tr.querySelector('[data-type="acm"]').textContent     = acmTotal;
+  
+  // Auto-advance logic
+  if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
+  if (uiVal.length > 0 && valid.includes(uiVal)) {
+      const isPrefix = valid.some(v => v !== uiVal && v.startsWith(uiVal));
+      if (isPrefix) {
+          window.autoAdvanceTimer = setTimeout(() => {
+              moveToNextCell(inp, 'right');
+          }, 350);
+      } else {
+          moveToNextCell(inp, 'right');
+      }
+  }
+}
+
+function moveToNextCell(inp, direction) {
+    const tr = inp.closest('tr');
+    const inputs = Array.from(tr.querySelectorAll('input.day-inp:not([disabled])'));
+    const index = inputs.indexOf(inp);
+    if (index > -1) {
+        if (direction === 'right' && index < inputs.length - 1) {
+            inputs[index + 1].focus();
+            inputs[index + 1].select();
+        } else if (direction === 'left' && index > 0) {
+            inputs[index - 1].focus();
+            inputs[index - 1].select();
+        }
+    }
+}
+
+function onDayKeyDown(e, inp) {
+    if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
+        moveToNextCell(inp, 'right');
+    } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
+        moveToNextCell(inp, 'left');
+    } else if (e.key === 'Tab') {
+        e.preventDefault();
+        if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
+        if (e.shiftKey) {
+            moveToNextCell(inp, 'left');
+        } else {
+            moveToNextCell(inp, 'right');
+        }
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
+    }
 }
 
 async function saveAllAttendance() {
@@ -572,7 +682,7 @@ async function deleteAttendanceEmployee(empId) {
     let url = `/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(empId)}?scope=${scope}`;
     if (scope === 'month') {
       if (!currentMonth || !currentYear) {
-        alert("Please select a Month and Year to delete for a single month.");
+        showToast("Please select a Month and Year to delete for a single month.");
         statusEl.textContent = '';
         return;
       }
@@ -582,7 +692,7 @@ async function deleteAttendanceEmployee(empId) {
     if (!res.ok) throw new Error(await res.text());
     statusEl.textContent = `Deleted ${empId} ✓`;
     loadAttendance();
-  } catch (err) {
+  hideLoader(); } catch (err) {
     statusEl.style.color = 'red';
     statusEl.textContent = 'Delete failed: ' + err.message;
   }
@@ -595,7 +705,7 @@ async function downloadAttendanceExcel() {
   const year = document.getElementById('attYear').value;
 
   if (!loc || !wh) {
-    alert('Please select both Location and Warehouse first.');
+    showToast('Please select both Location and Warehouse first.');
     return;
   }
 
@@ -609,6 +719,73 @@ async function downloadAttendanceExcel() {
 }
 
 boot();
+
+
+// Toasts
+  function showToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+  
+  // Also fix the actions TD to stick
+
+
+
+  // Toasts and Loader functions
+  function showToast(message, type = 'success') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    let icon = '';
+    if(type === 'success') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+    if(type === 'error') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+    if(type === 'warning') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
+    
+    toast.innerHTML = `${icon}<span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100%)';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  function showLoader(text) {
+    const loader = document.getElementById('globalLoader');
+    if(loader) {
+      document.getElementById('loaderText').textContent = text || 'Processing...';
+      loader.style.display = 'flex';
+    }
+  }
+  
+  function hideLoader() {
+    const loader = document.getElementById('globalLoader');
+    if(loader) loader.style.display = 'none';
+  }
+  
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('rs_auth');
+    window.location.href = '/login.html';
+  });
 </script>
 </body>
 </html>

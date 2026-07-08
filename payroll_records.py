@@ -145,6 +145,14 @@ def generate_monthly_payroll(month: int, year: int,
                 continue
             if not isinstance(v, dict):
                 doc[k] = v
+                if k.startswith("EARNING -"):
+                    doc["earnings"][k] = v
+                elif k.startswith("Deductions -"):
+                    doc["deductions"][k] = v
+                elif k.startswith("CONTRIBUTION -"):
+                    doc["contributions"][k] = v
+                elif k == "Net Pay":
+                    doc["net_pay"] = v
 
         db[PAYROLL_COLLECTION].insert_one(doc)
         created += 1

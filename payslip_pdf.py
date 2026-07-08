@@ -14,56 +14,61 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
     """
     Renders the Jinja2 HTML template and converts it to PDF using Playwright.
     """
-    identity = payroll_record.get('identity', {})
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
+    from app import _flatten_doc
+
+    flat_record = _flatten_doc(payroll_record)
     
-    # Fallback to employee_master if identity is missing or incomplete
+    # Fallback to employee_master if missing
     if db is not None:
-        master = db["employee_master"].find_one({"emp_id": payroll_record.get('emp_id')})
+        master = db["employee_master"].find_one({"emp_id": flat_record.get('emp_id')})
         if master:
-            master_identity = master.get("identity", {})
-            for k, v in master_identity.items():
-                if k not in identity or not identity[k]:
-                    identity[k] = v
+            master_flat = _flatten_doc(master)
+            for k, v in master_flat.items():
+                if k not in flat_record or not flat_record[k]:
+                    flat_record[k] = v
                     
     # Employee info extraction
     emp = {
-        'month': payroll_record.get('month'),
-        'year': payroll_record.get('year'),
-        'emp_id': payroll_record.get('emp_id', identity.get('Sl No', '')),
-        'designation': identity.get('Designation', ''),
-        'emp_name': payroll_record.get('emp_name', identity.get('Employee Name', '')),
-        'warehouse': payroll_record.get('warehouse', identity.get('Department', '')),
-        'uan_number': identity.get('UAN', ''),
-        'bank_account_number': identity.get('ACCOUNT', ''),
-        'esi_number': identity.get('ESIC', ''),
-        'doj': identity.get('DOJ', ''),
-        'working_days': payroll_record.get('FIXED - Working Days', 30),
-        'pay_days': payroll_record.get('ATTENDANCE - Pay Days', identity.get('ATTENDANCE - Pay Days', 0)),
+        'month': flat_record.get('month'),
+        'year': flat_record.get('year'),
+        'emp_id': flat_record.get('emp_id') or flat_record.get('Sl No', ''),
+        'designation': flat_record.get('Designation', ''),
+        'emp_name': flat_record.get('emp_name') or flat_record.get('Employee Name', ''),
+        'warehouse': flat_record.get('warehouse') or flat_record.get('Department', ''),
+        'uan_number': flat_record.get('UAN', ''),
+        'bank_account_number': flat_record.get('ACCOUNT', ''),
+        'esi_number': flat_record.get('ESIC', ''),
+        'doj': flat_record.get('DOJ', ''),
+        'working_days': flat_record.get('FIXED - Working Days', 30),
+        'pay_days': flat_record.get('ATTENDANCE - Pay Days', 0),
         
         # Fixed
-        'fixed_basic': float(payroll_record.get('FIXED - Basic', 0)),
-        'fixed_da': float(payroll_record.get('FIXED - DA', 0)),
-        'fixed_other': float(payroll_record.get('FIXED - Other Allows', 0)),
-        'fixed_leave': float(payroll_record.get('FIXED - Leave With wages', 0)),
-        'fixed_bonus': float(payroll_record.get('FIXED - Bonus @8.33%', 0)),
+        'fixed_basic': float(flat_record.get('FIXED - Basic', 0)),
+        'fixed_da': float(flat_record.get('FIXED - DA', 0)),
+        'fixed_other': float(flat_record.get('FIXED - Other Allows', 0)),
+        'fixed_leave': float(flat_record.get('FIXED - Leave With wages', 0)),
+        'fixed_bonus': float(flat_record.get('FIXED - Bonus @8.33%', 0)),
         
         # Earned
-        'earned_basic': float(payroll_record.get('EARNING - Basic', 0)),
-        'earned_da': float(payroll_record.get('EARNING - DA', 0)),
-        'earned_other': float(payroll_record.get('EARNING - Other Allows', 0)),
-        'earned_leave': float(payroll_record.get('EARNING - Leave With wages', 0)),
-        'earned_bonus': float(payroll_record.get('EARNING - Bonus @8.33%', 0)),
+        'earned_basic': float(flat_record.get('EARNING - Basic', 0)),
+        'earned_da': float(flat_record.get('EARNING - DA', 0)),
+        'earned_other': float(flat_record.get('EARNING - Other Allows', 0)),
+        'earned_leave': float(flat_record.get('EARNING - Leave With wages', 0)),
+        'earned_bonus': float(flat_record.get('EARNING - Bonus @8.33%', 0)),
         
         # Deductions
-        'pf': float(payroll_record.get('Deductions - PF 12%', 0)),
-        'esi': float(payroll_record.get('Deductions - ESIC 0.75%', 0)),
-        'pt': float(payroll_record.get('Deductions - PT', 0)),
-        'advance': float(payroll_record.get('Deductions - Adv', 0)),
+        'pf': float(flat_record.get('Deductions - PF 12%', 0)),
+        'esi': float(flat_record.get('Deductions - ESIC 0.75%', 0)),
+        'pt': float(flat_record.get('Deductions - PT', 0)),
+        'advance': float(flat_record.get('Deductions - Adv', 0)),
     }
 
-    gross_earnings = float(payroll_record.get('EARNING - Total', 0))
-    gross_deductions = float(payroll_record.get('Deductions - Total Deduction', 0))
-    net_pay = float(payroll_record.get('Net Pay', 0))
+    gross_earnings = float(flat_record.get('EARNING - Total', 0))
+    gross_deductions = float(flat_record.get('Deductions - Total Deduction', 0))
+    net_pay = float(flat_record.get('Net Pay', flat_record.get('net_pay', 0)))
     
     template_dir = os.path.join(os.path.dirname(__file__), "templates")
     env = Environment(loader=FileSystemLoader(template_dir))
