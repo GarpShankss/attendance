@@ -934,6 +934,57 @@ def send_whatsapp_endpoint(payroll_id: str):
     else:
         raise HTTPException(500, "WhatsApp delivery failed (check logs)")
 
+@app.get("/download_bank_details")
+def download_bank_details(month: int, year: int, location: str, warehouse: str):
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment
+    from openpyxl.utils import get_column_letter
+    import io
+    from fastapi.responses import StreamingResponse
+    from urllib.parse import quote
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Bank Details"
+
+    headers = ["Employee Name", "IFSC", "Account Number", "Location", "Warehouse"]
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="F97316", end_color="F97316", fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
+    
+    query = {"month": month, "year": year, "location": location, "warehouse": warehouse}
+    docs = list(db["payroll_records"].find(query).sort("emp_id", 1))
+    
+    for row_num, d in enumerate(docs, 2):
+        flat = _flatten_doc(d)
+        emp_name = flat.get("Employee Name") or flat.get("emp_name") or ""
+        ifsc = flat.get("IFSC") or ""
+        acc = flat.get("ACCOUNT") or ""
+        loc = flat.get("location") or ""
+        wh = flat.get("warehouse") or ""
+        
+        ws.cell(row=row_num, column=1, value=emp_name)
+        ws.cell(row=row_num, column=2, value=ifsc)
+        ws.cell(row=row_num, column=3, value=str(acc) if acc else "")
+        ws.cell(row=row_num, column=4, value=loc)
+        ws.cell(row=row_num, column=5, value=wh)
+
+    for i in range(1, 6):
+        ws.column_dimensions[get_column_letter(i)].width = 25
+
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    
+    filename = f"Bank_Details_{location}_{warehouse}_{month}_{year}.xlsx"
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+    )
+
 @app.get("/payroll")
 def list_payroll(month: int, year: int,
                 location: str = None, warehouse: str = None):
@@ -1003,6 +1054,17 @@ def create_employee(payload: dict = Body(...)):
         "last_source":  "manual",
     }
     db["employee_master"].insert_one(doc)
+    
+    # Automatically generate their payroll record for the month they joined,
+    # so they immediately appear in the Salary Sheet without a manual "Generate" click.
+    generate_monthly_payroll(
+        month=doc["joined_month"],
+        year=doc["joined_year"],
+        location=location,
+        warehouse=warehouse,
+        db=db
+    )
+    
     return {"ok": True, "emp_id": emp_id}
 
 

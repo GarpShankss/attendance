@@ -131,8 +131,26 @@
         Employment Details
       </h3>
       <div class="form-grid">
-        <div class="field"><label>Location *</label><input type="text" name="location" required></div>
-        <div class="field"><label>Warehouse *</label><input type="text" name="warehouse" required></div>
+        <div class="field"><label>Location *</label><select id="location" name="location" required><option value="">Select location</option></select></div>
+        <div class="field"><label>Warehouse *</label><select id="warehouse" name="warehouse" required><option value="">Select warehouse</option></select></div>
+        <div class="field">
+          <label>Joined Month *</label>
+          <select name="joined_month" id="joined_month" required>
+            <option value="">Select Month</option>
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Joined Year *</label>
+          <select name="joined_year" id="joined_year" required>
+            <option value="">Select Year</option>
+            <option value="2024">2024</option><option value="2025">2025</option>
+            <option value="2026">2026</option><option value="2027">2027</option>
+          </select>
+        </div>
         <div class="field"><label>Designation</label><input type="text" name="designation"></div>
         <div class="field"><label>Department</label><input type="text" name="department"></div>
         <div class="field"><label>Date of Joining (DOJ)</label><input type="date" name="doj"></div>
@@ -227,11 +245,19 @@ function populateWarehouse() {
     whs.map(w => `<option value="${w}">${w}</option>`).join('');
 }
 
-function n(id) {
-  const v = document.getElementById(id).value;
+function getEl(nameOrId) {
+  return document.querySelector(`[name="${nameOrId}"]`) || document.getElementById(nameOrId);
+}
+function n(name) {
+  const el = getEl(name);
+  if (!el) return 0;
+  const v = el.value;
   return v === '' ? 0 : parseFloat(v) || 0;
 }
-function s(id) { return document.getElementById(id).value.trim(); }
+function s(name) {
+  const el = getEl(name);
+  return el ? el.value.trim() : '';
+}
 
 async function saveEmployee() {
   const statusEl = document.getElementById('statusMsg');
@@ -239,10 +265,10 @@ async function saveEmployee() {
   statusEl.textContent = '';
 
   // Validate required fields
-  const required = ['emp_id','emp_name','location','warehouse'];
+  const required = ['emp_id','emp_name','location','warehouse','joined_month','joined_year'];
   let valid = true;
   required.forEach(id => {
-    const el = document.getElementById(id);
+    const el = getEl(id);
     if (!el.value.trim()) {
       el.classList.add('error');
       valid = false;
@@ -251,7 +277,7 @@ async function saveEmployee() {
     }
   });
   if (!valid) {
-    showToast(err.message, 'error'); statusEl.textContent='';
+    showToast('Please fill in all required fields (marked with *).', 'error');
     statusEl.textContent = 'Please fill in all required fields (marked with *).';
     return;
   }
@@ -286,7 +312,7 @@ async function saveEmployee() {
       "ESIC":           s('esic'),
       "ACCOUNT":        s('account'),
       "IFSC":           s('ifsc'),
-      "Phone Number":   s('phone_number'),
+      "Phone Number":   s('mobile'),
       "WC NO":          s('wc_no'),
     },
   };
@@ -303,24 +329,17 @@ async function saveEmployee() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || JSON.stringify(data));
 
-    showToast(data.message, 'success'); statusEl.textContent='';
-    statusEl.textContent = `Employee ${payload.emp_id} saved successfully ✓  — they will appear in payroll from ${MONTH_NAMES[payload.joined_month]} ${payload.joined_year} onward.`;
+    showToast("Employee added successfully", 'success');
+    statusEl.textContent = `Employee ${payload.emp_id} saved successfully ✓`;
     resetForm();
   } catch (e) {
-    showToast(err.message, 'error'); statusEl.textContent='';
+    showToast(e.message, 'error');
     statusEl.textContent = 'Error: ' + e.message;
   }
 }
 
 function resetForm() {
-  ['emp_id','emp_name','department','designation','doj','uan','esic','account','ifsc','phone_number','wc_no']
-    .forEach(id => { document.getElementById(id).value = ''; });
-  ['fixed_basic','fixed_da','fixed_other','fixed_leave','fixed_bonus','service_charge','uniform','tshirt','shoes','advance']
-    .forEach(id => { document.getElementById(id).value = ''; });
-  document.getElementById('working_days').value = '26';
-  document.getElementById('location').value = '';
-  document.getElementById('warehouse').innerHTML = '<option value="">Select warehouse</option>';
-  document.getElementById('active_status').value = 'Active';
+  document.getElementById('empForm').reset();
 }
 
 boot();
@@ -371,6 +390,11 @@ boot();
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
+
+  document.getElementById('empForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveEmployee();
+  });
 
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('rs_auth');
