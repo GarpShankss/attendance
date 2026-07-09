@@ -383,6 +383,7 @@ let WAREHOUSES = {};
 let pendingToken = null;
 let pendingSheets = [];
 let currentColumns = [];
+let currentData = [];
 // track rows in edit mode: rowKey -> original td values
 let editingRows = {};
 
@@ -566,6 +567,7 @@ async function loadData() {
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
     currentColumns = data.columns;
+    currentData = data.rows;
     renderDataTable(data.columns, data.rows);
     updateDashboardStats(params, data.rows);
     const monthYearSelected = Boolean(els.filterMonth.value && els.filterYear.value);
@@ -1157,6 +1159,46 @@ loadSettings();
           }
       }
   }, { passive: false });
+
+  // ── Live Salary Updates (SSE) ──────────────────────────────────────────────
+  const evtSource = new EventSource('/events');
+  evtSource.onmessage = async (e) => {
+    const empId = e.data;
+    console.log("[SSE] Received broadcast for empId:", empId);
+    
+    // Only update if filters are set and we are actively viewing data
+    if (els.filterMonth.value && els.filterYear.value && els.filterLocation.value && els.filterWarehouse.value) {
+      const rowKey = `payroll_records__${empId}`;
+      const tr = document.querySelector(`tr[data-row-key="${rowKey}"]`);
+      
+      // If the row is visible and the user is NOT actively editing ANY row
+      if (tr && Object.keys(editingRows).length === 0) {
+        try {
+          const loc = encodeURIComponent(els.filterLocation.value);
+          const wh = encodeURIComponent(els.filterWarehouse.value);
+          const mo = els.filterMonth.value;
+          const yr = els.filterYear.value;
+          const emp = encodeURIComponent(empId);
+          
+          let res = await fetch(`/payroll_record/${loc}/${wh}/${mo}/${yr}/${emp}`);
+          if (res.ok) {
+            let rowData = await res.json();
+            if (rowData && rowData.emp_id) {
+               // Update global data array
+               const idx = currentData.findIndex(r => r.emp_id === empId && r._collection === 'payroll_records');
+               if (idx !== -1) {
+                  currentData[idx] = rowData;
+                  // Re-render the whole table quickly to update this row and all totals/footers
+                  renderDataTable(currentColumns, currentData);
+               }
+            }
+          }
+        } catch (err) {
+          console.error("SSE fetch failed", err);
+        }
+      }
+    }
+  };
 </script>
 
 </body>

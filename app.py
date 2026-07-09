@@ -19,7 +19,25 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 import calendar
+import json
+import asyncio
+from fastapi.responses import StreamingResponse
 from datetime import timedelta
+
+class EventBroadcaster:
+    def __init__(self):
+        self.queues = []
+    async def listen(self):
+        q = asyncio.Queue()
+        self.queues.append(q)
+        try:
+            while True:
+                msg = await q.get()
+                yield f"data: {msg}\n\n"
+        except asyncio.CancelledError:
+            self.queues.remove(q)
+
+broadcaster = EventBroadcaster()
 
 from mongo_loader import load_sheet_into_collection, guess_warehouse
 from parse_excel import parse_workbook, drop_empty_columns
@@ -462,6 +480,34 @@ def get_available_months(location: str = None, warehouse: str = None):
     result = sorted(pairs, key=lambda x: (x[1], x[0]))
     return {"months": [{"month": m, "year": y} for m, y in result]}
 
+
+@app.get("/events")
+async def sse_events():
+    return StreamingResponse(
+        broadcaster.listen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
+
+@app.get("/payroll_record/{location}/{warehouse}/{month}/{year}/{emp_id}")
+def get_payroll_record_endpoint(location: str, warehouse: str, month: int, year: int, emp_id: str):
+    doc = db["payroll_records"].find_one({
+        "location": location,
+        "warehouse": warehouse,
+        "month": month,
+        "year": year,
+        "emp_id": emp_id
+    })
+    if not doc:
+        return {}
+    flat = _flatten_doc(doc)
+    flat["_id"] = str(doc.get("_id"))
+    flat["_collection"] = "payroll_records"
+    flat["_row_id"] = emp_id
+    return flat
 
 @app.get("/data")
 def get_filtered_data(location: str = None, warehouse: str = None,
@@ -1095,7 +1141,9 @@ def save_attendance(location: str, warehouse: str, emp_id: str,
                     update_fields["Net Pay"] = v
         if update_fields:
             db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
-
+            print(f"[SSE BROADCAST] Firing attendance save event for emp_id: {emp_id}")
+            for q in broadcaster.queues:
+                q.put_nowait(emp_id)
 
     return {"ok": True}
 
