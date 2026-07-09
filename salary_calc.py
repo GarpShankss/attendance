@@ -47,6 +47,8 @@ COLUMN_MAP = {
     "fixed_service_charge":   "CONTRIBUTION - Service Charge",
     "fixed_tshirt":           "CONTRIBUTION - T Shirt",
     "fixed_shoes":            "CONTRIBUTION - Shoes",
+    "emp_contribution":       "CONTRIBUTION - Total Employer Contribution",
+    "ctc":                    "CONTRIBUTION - CTC",
     "total_ctc":              "CONTRIBUTION - Total CTC",
     "gst":                    "CONTRIBUTION - GST @18%",
     "billing":                "CONTRIBUTION - Total Billing",
@@ -313,13 +315,9 @@ def recalculate(row: dict) -> dict:
     L("")
 
     # ── Service Charge ───────────────────────────────────────────────────────
-    service_charge = R(fixed_sc / working_days * pay_days) if fixed_sc else 0
-    L("── SERVICE CHARGE  [ROUND(Fixed SC / Working Days × Pay Days, 0)] ──")
-    if fixed_sc:
-        L(f"  = ROUND({fixed_sc} / {working_days} × {pay_days}, 0)"
-          f"  = ROUND({fixed_sc / working_days * pay_days:.4f}, 0)  = {service_charge}")
-    else:
-        L(f"  = 0  (no fixed service charge in this row)")
+    service_charge = fixed_sc
+    L("── SERVICE CHARGE  [Used As-Is] ─────────────────────────────────────────")
+    L(f"  = {service_charge}")
     L("")
 
     # ── Total CTC ────────────────────────────────────────────────────────────
@@ -364,6 +362,8 @@ def recalculate(row: dict) -> dict:
     put(r, "net_pay",         net_pay)
     put(r, "emp_pf",          emp_pf)
     put(r, "emp_esi",         emp_esi)
+    put(r, "emp_contribution", emp_contribution)
+    put(r, "ctc",             ctc)
     put(r, "total_ctc",       total_ctc)
 
     r["__calc_log__"] = log

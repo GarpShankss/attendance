@@ -339,8 +339,7 @@ def _flatten_doc(doc: dict):
     for k, v in doc.items():
         if k in {"_id", "identity", "salary", "attendance", "earnings", "deductions", "contributions"}:
             continue
-        if k not in flat:
-            flat[k] = v
+        flat[k] = v
 
     # Recursively flatten any nested dictionaries that might have been created by MongoDB's dot-notation
     fully_flat = _flatten_nested_keys(flat)
@@ -383,29 +382,31 @@ def _map_payroll_updates(name: str, to_write: dict, stored: dict = None):
     for key, value in to_write.items():
         if key.startswith("EARNING -"):
             earnings_updates[key] = value
+            mapped[key] = value
         elif key.startswith("Deductions -"):
             deductions_updates[key] = value
+            mapped[key] = value
         elif key == "Net Pay":
             mapped["net_pay"] = value
+            mapped["Net Pay"] = value
         elif key in ("ATTENDANCE - Present Days", "ATTENDANCE - Pay Days"):
             attendance_updates[key] = value
-        elif key in ("CONTRIBUTION - Service Charge",
-                     "CONTRIBUTION - T Shirt",
-                     "CONTRIBUTION - Shoes",
-                     "CONTRIBUTION - Uniform Charges"):
-            salary_updates[key] = value
+            mapped[key] = value
         elif key.startswith("CONTRIBUTION -"):
             contributions_updates[key] = value
+            mapped[key] = value
         elif key in ("emp_id", "emp_name", "location", "warehouse", "month", "year", "status"):
             mapped[key] = value
         elif key == "Mobile Number" or key == "mobile_number":
             mapped["mobile_number"] = value
             identity_updates["Mobile Number"] = value
             identity_updates["mobile_number"] = value
-        elif key in ("Fixed Basic", "Fixed DA", "Fixed Other", "Leave", "Bonus", "Fixed SC", "Uniform", "Shoes", "T Shirt", "Fixed Gross"):
+        elif key.startswith("FIXED -") or key in ("Fixed SC", "Uniform", "Shoes", "T Shirt", "Fixed Gross"):
             salary_updates[key] = value
+            mapped[key] = value
         else:
             identity_updates[key] = value
+            mapped[key] = value
 
     def _merge(subdoc_name, updates):
         if not updates:
