@@ -702,7 +702,7 @@ function renderDataTable(columns, rows) {
   let totals = {};
   allColumns.forEach(c => totals[c] = 0);
 
-  const body = '<tbody>' + rows.map(r => {
+  const body = '<tbody>' + rows.map((r, i) => {
     const rowKey = `${r._collection}__${r._row_id}`;
     
     let actionButtons = '';
