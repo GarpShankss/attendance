@@ -37,13 +37,6 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
     docs = []
     for i, row in enumerate(rows, start=1):
         doc = normalize_row(dict(row))
-        if doc.get("ID Number") == "RSMAB0006":
-            print("\n========== PARSED ROW ==========")
-            print("Working Days      :", row.get("FIXED - Working Days"))
-            print("Leave With Wages  :", row.get("FIXED - Leave With wages"))
-            print("Total             :", row.get("FIXED - Total"))
-            print("Bonus             :", row.get("FIXED - Bonus @8.33%"))
-            print("===============================\n")
         doc["_row_id"] = i
         doc["_source_file"] = source_file
         doc["_sheet"] = sheet_name

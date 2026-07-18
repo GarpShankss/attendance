@@ -228,7 +228,7 @@ def recalculate(row: dict) -> dict:
     overrides = r.get("_manual_overrides", [])
 
     def L(msg):
-        log.append(msg)
+        pass
 
     working_days = get(r, "working_days") or 30
     present_days = get(r, "present_days")

@@ -819,10 +819,10 @@ async function saveRow(rowKey) {
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
 
-    // show calculation log
-    if (data.calc_log && data.calc_log.length) {
-      console.log("Calculation log:", data.calc_log);
-    }
+    // hide calculation log to improve UI performance
+    // if (data.calc_log && data.calc_log.length) {
+    //   console.log("Calculation log:", data.calc_log);
+    // }
 
     delete editingRows[rowKey];
     // update cells by reloading data to preserve all action buttons properly
