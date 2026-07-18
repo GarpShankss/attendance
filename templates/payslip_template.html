@@ -276,6 +276,14 @@
         <td class="amount"></td>
       </tr>
 
+      <tr>
+        <td class="desc">HRA</td>
+        <td class="amount">{{ "%.0f"|format(emp.fixed_hra|default(0)) }}</td>
+        <td class="amount">{{ "%.0f"|format(emp.earned_hra|default(0)) }}</td>
+        <td class="desc"></td>
+        <td class="amount"></td>
+      </tr>
+
       <tr class="total-row">
         <td class="desc">TOTAL</td>
         <td class="amount"></td>

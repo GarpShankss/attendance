@@ -90,6 +90,8 @@ ALIASES = {
     "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes"],
     "fixed_tshirt": ["T SHIRT", "T-Shirt", "CONTRIBUTION - T Shirt"],
     "fixed_service_charge": ["SERVICE CHARGES", "Service Charge", "CONTRIBUTION - Service Charge"],
+    "ACCOUNT":      ["Account No", "A/C No", "Bank Account", "Account Number", "A/c Number", "A/C", "Bank A/c", "ACCOUNT"],
+    "IFSC":         ["IFSC Code", "IFSC", "IFSC CODE", "NEFT IFSC Code"],
 }
 
 def R(v):

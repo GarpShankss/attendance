@@ -51,6 +51,7 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
         'fixed_other': float(flat_record.get('FIXED - Other Allows', 0)),
         'fixed_leave': float(flat_record.get('FIXED - Leave With wages', 0)),
         'fixed_bonus': float(flat_record.get('FIXED - Bonus @8.33%', 0)),
+        'fixed_hra': float(flat_record.get('FIXED - HRA', 0)),
         
         # Earned
         'earned_basic': float(flat_record.get('EARNING - Basic', 0)),
@@ -58,6 +59,7 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
         'earned_other': float(flat_record.get('EARNING - Other Allows', 0)),
         'earned_leave': float(flat_record.get('EARNING - Leave With wages', 0)),
         'earned_bonus': float(flat_record.get('EARNING - Bonus @8.33%', 0)),
+        'earned_hra': float(flat_record.get('EARNING - HRA', 0)),
         
         # Deductions
         'pf': float(flat_record.get('Deductions - PF 12%', 0)),
