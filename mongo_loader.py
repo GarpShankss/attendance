@@ -26,6 +26,8 @@ def guess_warehouse(sheet_name, warehouse_list):
     return None
 
 
+from salary_calc import normalize_row
+
 def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, source_file):
     """Load ONE already-parsed sheet into its own collection (cleared first)."""
     columns, rows = drop_empty_columns(sheet_data["columns"], sheet_data["rows"])
@@ -34,8 +36,8 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
     coll.delete_many({})
     docs = []
     for i, row in enumerate(rows, start=1):
-        doc = dict(row)
-        if row.get("ID Number") == "RSMAB0006":
+        doc = normalize_row(dict(row))
+        if doc.get("ID Number") == "RSMAB0006":
             print("\n========== PARSED ROW ==========")
             print("Working Days      :", row.get("FIXED - Working Days"))
             print("Leave With Wages  :", row.get("FIXED - Leave With wages"))
@@ -56,7 +58,7 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
 
     # Upsert into permanent employee master
     upsert_employees(
-        rows=rows,
+        rows=[{k: v for k, v in doc.items() if not k.startswith("_")} for doc in docs],
         location=location,
         warehouse=warehouse or "",
         source_file=source_file,

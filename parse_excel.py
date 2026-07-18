@@ -13,6 +13,7 @@ import openpyxl
 import xlrd
 
 SLNO_PATTERN = re.compile(r"^\s*s\.?\s*l?\.?\s*no\.?\s*$", re.I)
+EMP_ID_PATTERN = re.compile(r"^\s*(emp\.?\s*id|id\s*no\.?|employee\s*id|emp\s*name|employee\s*name)\s*$", re.I)
 TOTAL_PATTERN = re.compile(r"total", re.I)
 
 
@@ -77,11 +78,13 @@ def get_rows_xls(path):
 
 
 def find_header_row(rows):
-    """Find the row whose first few cells look like 'Sl.No' / 'S.No' style labels."""
+    """Find the row whose first few cells look like 'Sl.No' / 'S.No' / 'Emp ID' style labels."""
     for i, row in enumerate(rows[:25]):
-        for cell in row[:3]:
-            if isinstance(cell, str) and SLNO_PATTERN.match(cell.strip()):
-                return i
+        for cell in row[:5]:
+            if isinstance(cell, str):
+                cleaned = cell.strip()
+                if SLNO_PATTERN.match(cleaned) or EMP_ID_PATTERN.match(cleaned):
+                    return i
     return None
 
 

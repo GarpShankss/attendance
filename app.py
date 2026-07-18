@@ -53,7 +53,8 @@ MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "payroll_db")
 
 import certifi
-client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+if MONGO_URI.startswith("mongodb+srv://"):
+    client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client[DB_NAME]
 
 app = FastAPI()
@@ -82,6 +83,7 @@ def debug_trace(name: str, row_id: int):
         "FIXED - Other Allows",
         "FIXED - Leave With wages",
         "FIXED - Bonus @8.33%",
+        "FIXED - HRA",
         "FIXED - Total",
         "ATTENDANCE - Pay Days",
         "ATTENDANCE - Present Days",
@@ -173,7 +175,7 @@ def debug_row(name: str, row_id: int):
     input_fields = [
         "working_days", "pay_days",
         "fixed_basic", "fixed_da", "fixed_other", "fixed_leave", "fixed_bonus",
-        "fixed_service_charge", "uniform", "advance",
+        "fixed_hra", "fixed_service_charge", "uniform", "advance",
     ]
     inputs = {}
     for field in input_fields:
@@ -621,19 +623,23 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
     FRONTEND_READONLY = {
         'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
         'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 
-        'EARNING - Bonus @8.33%', 'EARNING - OT Amount', 'EARNING - Total',
-        'Deductions - PF 12%', 'Deductions - ESIC 0.75%', 'Deductions - PT', 'Deductions - Total Deduction',
-        'CONTRIBUTION - EPF @ 13%', 'CONTRIBUTION - ESIC @ 3.25%', 'CONTRIBUTION - Total Employer Contribution',
-        'CONTRIBUTION - CTC', 'CONTRIBUTION - Total CTC', 'Net Pay'
+        'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - OT Amount', 'EARNING - Total',
+        'Net Pay'
     }
 
     # 1. Apply editable fields from payload to base
     editable_updates = {}
+    manual_overrides = stored.get("_manual_overrides", []) if stored else []
     for k, v in payload.items():
         ck = _clean_key(k)
         if ck not in FRONTEND_READONLY and ck not in {_clean_key(h) for h in HIDDEN_FIELDS}:
             base[ck] = v
             editable_updates[ck] = v
+            # If it's a known output column, record that the user manually edited it
+            if ck in COLUMN_MAP.values() and ck not in manual_overrides:
+                manual_overrides.append(ck)
+
+    base["_manual_overrides"] = manual_overrides
 
     # 2. Run salary calculation on the updated base
     calculated = recalculate(base)
@@ -650,6 +656,8 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
     updates = {}
     if to_write:
         updates.update(_map_payroll_updates(name, to_write, stored=stored))
+    
+    updates["_manual_overrides"] = manual_overrides
 
     if not updates:
         raise HTTPException(400, "No columns to update")
@@ -668,17 +676,48 @@ def recalculate_row(name: str, row_id: str):
     return save_row(name, row_id, {})
 
 
+from payroll_records import ATTENDANCE_COLLECTION, PAYROLL_COLLECTION
+from employee_master import MASTER_COLLECTION
+
 @app.delete("/employee/{location}/{warehouse}/{emp_id}")
 def delete_employee(location: str, warehouse: str, emp_id: str):
-    att_res = db[ATTENDANCE_COLL].delete_many({
+    att_res = db[ATTENDANCE_COLLECTION].delete_many({
         "location": location,
         "warehouse": warehouse,
         "emp_id": emp_id,
     })
-    pay_res = db["payroll_records"].delete_many({
+    pay_res = db[PAYROLL_COLLECTION].delete_many({
         "location": location,
         "warehouse": warehouse,
         "emp_id": emp_id,
+    })
+    master_res = db[MASTER_COLLECTION].delete_many({
+        "location": location,
+        "warehouse": warehouse,
+        "emp_id": emp_id,
+    })
+    return {
+        "ok": True,
+        "attendance_deleted": att_res.deleted_count,
+        "payroll_deleted": pay_res.deleted_count,
+        "master_deleted": master_res.deleted_count,
+    }
+
+@app.delete("/attendance/{location}/{warehouse}/{emp_id}")
+def delete_employee_month(location: str, warehouse: str, emp_id: str, month: int, year: int):
+    att_res = db[ATTENDANCE_COLLECTION].delete_many({
+        "location": location,
+        "warehouse": warehouse,
+        "emp_id": emp_id,
+        "month": month,
+        "year": year
+    })
+    pay_res = db[PAYROLL_COLLECTION].delete_many({
+        "location": location,
+        "warehouse": warehouse,
+        "emp_id": emp_id,
+        "month": month,
+        "year": year
     })
     return {
         "ok": True,
@@ -729,14 +768,14 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
         ]),
         ("Fixed", [
             ("Working Days", "FIXED - Working Days"), ("Basic", "FIXED - Basic"), ("DA", "FIXED - DA"), ("Other Allows", "FIXED - Other Allows"),
-            ("Leave With wages", "FIXED - Leave With wages"), ("Bonus @8.33%", "FIXED - Bonus @8.33%"), ("Total", "FIXED - Total")
+            ("Leave With wages", "FIXED - Leave With wages"), ("Bonus @8.33%", "FIXED - Bonus @8.33%"), ("HRA", "FIXED - HRA"), ("Total", "FIXED - Total")
         ]),
         ("Attendance", [
             ("Present Days", "ATTENDANCE - Present Days"), ("Holi day", "ATTENDANCE - Holi day"), ("Pay Days", "ATTENDANCE - Pay Days"), ("OT Hours", "ATTENDANCE - OT Hours")
         ]),
         ("Earned", [
             ("Basic", "EARNING - Basic"), ("DA", "EARNING - DA"), ("Other Allows", "EARNING - Other Allows"), ("Leave With wages", "EARNING - Leave With wages"),
-            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("OT Amount", "EARNING - OT Amount"), ("Total", "EARNING - Total")
+            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("HRA", "EARNING - HRA"), ("OT Amount", "EARNING - OT Amount"), ("Total", "EARNING - Total")
         ]),
         ("Deductions", [
             ("PF 12%", "Deductions - PF 12%"), ("ESIC 0.75%", "Deductions - ESIC 0.75%"), ("PT", "Deductions - PT"), ("Adv", "Deductions - Adv"),

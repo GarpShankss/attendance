@@ -20,6 +20,7 @@ COLUMN_MAP = {
     "fixed_other":            "FIXED - Other Allows",
     "fixed_leave":            "FIXED - Leave With wages",
     "fixed_bonus":            "FIXED - Bonus @8.33%",
+    "fixed_hra":              "FIXED - HRA",
     "fixed_total":            "FIXED - Total",
     "working_days":           "FIXED - Working Days",
     "fixed_tshirt":           "CONTRIBUTION - T Shirt",
@@ -37,6 +38,7 @@ COLUMN_MAP = {
     "earned_other":           "EARNING - Other Allows",
     "earned_leave":           "EARNING - Leave With wages",
     "earned_bonus":           "EARNING - Bonus @8.33%",
+    "earned_hra":             "EARNING - HRA",
     "earned_ot":              "EARNING - OT Amount",
     "earned_total":           "EARNING - Total",
 
@@ -67,11 +69,22 @@ COLUMN_MAP = {
 # Fields that must never be overwritten (inputs, not outputs)
 READONLY_FIELDS = {
     "fixed_basic", "fixed_da", "fixed_other", "fixed_leave",
-    "fixed_bonus", "fixed_total", "working_days",
+    "fixed_bonus", "fixed_hra", "fixed_total", "working_days",
     "present_days", "holiday", "pay_days", "ot_hours",
     "uniform",
 }
 
+
+# Aliases for common variations in uploaded sheets
+ALIASES = {
+    "working_days": ["Basic Days", "Working Days"],
+    "present_days": ["Actual Days", "Present Days"],
+    "pay_days":     ["Actual Days", "Pay Days"],
+    "fixed_bonus":  ["FIXED - STATUORY BONUS", "FIXED - STATUTORY BONUS", "FIXED - Bonus", "Bonus", "FIXED - Bonus @8.33%"],
+    "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes"],
+    "fixed_tshirt": ["T SHIRT", "T-Shirt"],
+    "fixed_service_charge": ["SERVICE CHARGES", "Service Charge"],
+}
 
 def R(v):
     """Excel-compatible ROUND(v, 0) — round-half-up."""
@@ -100,9 +113,15 @@ def get(row: dict, field: str, default=0):
     if col is not None:
         if col in row:
             return _num(row[col], default)
-        norm_col = _re.sub(r'[\s]+', ' ', col).strip()
+        norm_col = _re.sub(r'[\s]+', ' ', col).strip().lower()
         for k, v in row.items():
-            if _re.sub(r'[\s]+', ' ', str(k)).strip() == norm_col:
+            if _re.sub(r'[\s]+', ' ', str(k)).strip().lower() == norm_col:
+                return _num(v, default)
+
+    if field in ALIASES:
+        for k, v in row.items():
+            k_norm = _re.sub(r'[\s]+', ' ', str(k)).strip().lower()
+            if any(k_norm == a.lower() for a in ALIASES[field]):
                 return _num(v, default)
 
     if field == "advance":
@@ -112,6 +131,45 @@ def get(row: dict, field: str, default=0):
                 return _num(v, default)
 
     return default
+
+def normalize_row(row: dict) -> dict:
+    """Standardize the keys of a raw Excel row to match exactly the COLUMN_MAP."""
+    import re as _re
+    normalized = {}
+    
+    alias_map = {}
+    for logical_key, aliases in ALIASES.items():
+        if logical_key in COLUMN_MAP:
+            target = COLUMN_MAP[logical_key]
+            for a in aliases:
+                alias_map[a.lower()] = target
+
+    for k, v in row.items():
+        if not isinstance(k, str):
+            normalized[k] = v
+            continue
+
+        k_norm = _re.sub(r'[\s]+', ' ', k).strip().lower()
+        
+        if k_norm == "adv" or k_norm == "advance" or "advance" in k_norm or k_norm.endswith(" adv") or k_norm.endswith(" advance"):
+            normalized[COLUMN_MAP["advance"]] = v
+            continue
+
+        if k_norm in alias_map:
+            normalized[alias_map[k_norm]] = v
+            continue
+
+        matched = False
+        for target_key in COLUMN_MAP.values():
+            if target_key and _re.sub(r'[\s]+', ' ', target_key).strip().lower() == k_norm:
+                normalized[target_key] = v
+                matched = True
+                break
+        
+        if not matched:
+            normalized[k] = v
+
+    return normalized
 
 
 def put(row: dict, field: str, value):
@@ -124,18 +182,23 @@ def put(row: dict, field: str, value):
     col = COLUMN_MAP.get(field)
     if col is None:
         return
+        
+    overrides = row.get("_manual_overrides", [])
+    if col in overrides:
+        return  # Do not overwrite if user manually edited this field
+        
     # direct hit
     if col in row:
         row[col] = value
         if field == 'net_pay':
             row['net_pay'] = value
         return
-    # normalise and match
-    norm_col = _re.sub(r'[\s]+', ' ', col).strip()
+    # normalise and match case-insensitively
+    norm_col = _re.sub(r'[\s]+', ' ', col).strip().lower()
     for k in row:
-        if _re.sub(r'[\s]+', ' ', str(k)).strip() == norm_col:
+        if _re.sub(r'[\s]+', ' ', str(k)).strip().lower() == norm_col:
             row[k] = value
-            if field == 'net_pay' and k == 'net_pay':
+            if field == 'net_pay' and k.lower() == 'net pay':
                 row['net_pay'] = value
             return
     # create missing output field if it was not already present
@@ -162,6 +225,7 @@ def recalculate(row: dict) -> dict:
 
     r = dict(row)
     log = []   # calculation trace — returned alongside the result
+    overrides = r.get("_manual_overrides", [])
 
     def L(msg):
         log.append(msg)
@@ -178,6 +242,7 @@ def recalculate(row: dict) -> dict:
     fixed_other = get(r, "fixed_other")
     fixed_leave = get(r, "fixed_leave")
     fixed_bonus = get(r, "fixed_bonus")
+    fixed_hra   = get(r, "fixed_hra")
     advance     = get(r, "advance")
     fixed_sc    = get(r, "fixed_service_charge")
     uniform     = get(r, "uniform")
@@ -196,6 +261,7 @@ def recalculate(row: dict) -> dict:
     L(f"  Fixed Other Allows    (FIXED - Other Allows)      = {fixed_other}")
     L(f"  Fixed Leave W/Wages   (FIXED - Leave With wages)  = {fixed_leave}")
     L(f"  Fixed Bonus           (FIXED - Bonus @8.33%)      = {fixed_bonus}")
+    L(f"  Fixed HRA             (FIXED - HRA)               = {fixed_hra}")
     L(f"  Fixed Service Charge  (CONTRIBUTION - SC)         = {fixed_sc}")
     L(f"  Uniform               (CONTRIBUTION - Uniform)    = {uniform}")
     L(f"  T Shirt               (CONTRIBUTION - T Shirt)     = {fixed_tshirt}")
@@ -235,28 +301,43 @@ def recalculate(row: dict) -> dict:
     earned_bonus = R(fixed_bonus / working_days * pay_days)
     L(f"  Earned Bonus  = ROUND({fixed_bonus} / {working_days} × {pay_days}, 0)"
       f"  = ROUND({fixed_bonus / working_days * pay_days:.4f}, 0)  = {earned_bonus}")
+
+    earned_hra = R(fixed_hra / working_days * pay_days)
+    L(f"  Earned HRA    = ROUND({fixed_hra} / {working_days} × {pay_days}, 0)"
+      f"  = ROUND({fixed_hra / working_days * pay_days:.4f}, 0)  = {earned_hra}")
     L("")
 
     # ── Total Earnings ───────────────────────────────────────────────────────
-    total_earnings = R(earned_basic + earned_da + earned_other + earned_leave + earned_bonus)
+    total_earnings = R(earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra)
     L("── TOTAL EARNINGS  [ROUND(sum of earned components, 0)] ────")
-    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_leave} + {earned_bonus}, 0)")
-    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_leave + earned_bonus}, 0)")
+    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_leave} + {earned_bonus} + {earned_hra}, 0)")
+    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra}, 0)")
     L(f"  = {total_earnings}")
     L("")
 
     # ── PF ───────────────────────────────────────────────────────────────────
-    pf_base = min(earned_basic + earned_da, pf_ceiling)
-    pf      = R(pf_base * emp_pf_pct)
-    L("── PF DEDUCTION  [ROUND(min(Earned Basic + Earned DA, ceiling) × PF%, 0)] ──")
-    L(f"  Base          = min({earned_basic} + {earned_da}, {pf_ceiling})"
-      f"  = min({earned_basic + earned_da}, {pf_ceiling})  = {pf_base}")
+    warehouse = str(r.get("warehouse", "")).strip().lower()
+    if warehouse == "abb":
+        pf_base = min(earned_basic + earned_da, pf_ceiling)
+        L(f"  Warehouse is ABB. Capping PF Base at {pf_ceiling}.")
+    else:
+        pf_base = earned_basic + earned_da
+        L(f"  Warehouse is not ABB. No cap on PF Base.")
+        
+    pf = R(pf_base * emp_pf_pct)
+    if COLUMN_MAP.get("ded_pf") in overrides:
+        pf = get(r, "ded_pf", pf)
+        L("  PF DEDUCTION MANUALLY OVERRIDDEN.")
+    L("── PF DEDUCTION  [ROUND(PF Base × PF%, 0)] ──")
+    L(f"  Base          = {pf_base}")
     L(f"  PF            = ROUND({pf_base} × {cfg['employee_pf_percent']}%, 0)"
       f"  = ROUND({pf_base * emp_pf_pct:.4f}, 0)  = {pf}")
     L("")
 
     # ── ESI ──────────────────────────────────────────────────────────────────
     esi = R(total_earnings * emp_esi_pct) if total_earnings < esi_ceiling else 0
+    if COLUMN_MAP.get("ded_esi") in overrides:
+        esi = get(r, "ded_esi", esi)
     L("── ESI DEDUCTION  [ROUND(IF(Total < ceiling, Total × ESI%, 0), 0)] ──")
     L(f"  Total Earnings {total_earnings} < ESI ceiling {esi_ceiling}? → {total_earnings < esi_ceiling}")
     if total_earnings < esi_ceiling:
@@ -268,6 +349,8 @@ def recalculate(row: dict) -> dict:
 
     # ── PT ───────────────────────────────────────────────────────────────────
     pt = pt_amount if total_earnings >= pt_threshold else 0
+    if COLUMN_MAP.get("ded_pt") in overrides:
+        pt = get(r, "ded_pt", pt)
     L("── PROFESSIONAL TAX  [IF(Total >= threshold, PT amount, 0)] ──")
     L(f"  Total Earnings {total_earnings} >= PT threshold {pt_threshold}? → {total_earnings >= pt_threshold}")
     L(f"  PT = {pt}")
@@ -287,6 +370,8 @@ def recalculate(row: dict) -> dict:
 
     # ── Employer PF ──────────────────────────────────────────────────────────
     emp_pf = R(pf_base * er_pf_pct)
+    if COLUMN_MAP.get("emp_pf") in overrides:
+        emp_pf = get(r, "emp_pf", emp_pf)
     L("── EMPLOYER PF  [ROUND(base × Employer PF%, 0)] ───────────")
     L(f"  = ROUND({pf_base} × {cfg['employer_pf_percent']}%, 0)"
       f"  = ROUND({pf_base * er_pf_pct:.4f}, 0)  = {emp_pf}")
@@ -294,6 +379,8 @@ def recalculate(row: dict) -> dict:
 
     # ── Employer ESI ─────────────────────────────────────────────────────────
     emp_esi = R(total_earnings * er_esi_pct) if total_earnings < esi_ceiling else 0
+    if COLUMN_MAP.get("emp_esi") in overrides:
+        emp_esi = get(r, "emp_esi", emp_esi)
     L("── EMPLOYER ESI  [ROUND(IF(Total < ceiling, Total × Emp ESI%, 0), 0)] ──")
     if total_earnings < esi_ceiling:
         L(f"  = ROUND({total_earnings} × {cfg['employer_esi_percent']}%, 0)"
@@ -331,6 +418,7 @@ def recalculate(row: dict) -> dict:
     L(f"  Earned Other Allows   = {earned_other}")
     L(f"  Earned Leave W/Wages  = {earned_leave}")
     L(f"  Earned Bonus          = {earned_bonus}")
+    L(f"  Earned HRA            = {earned_hra}")
     L(f"  Total Earnings        = {total_earnings}")
     L(f"  PF                    = {pf}")
     L(f"  ESI                   = {esi}")
@@ -354,6 +442,7 @@ def recalculate(row: dict) -> dict:
     put(r, "earned_other",    earned_other)
     put(r, "earned_leave",    earned_leave)
     put(r, "earned_bonus",    earned_bonus)
+    put(r, "earned_hra",      earned_hra)
     put(r, "earned_total",    total_earnings)
     put(r, "pf",              pf)
     put(r, "esi",             esi)
