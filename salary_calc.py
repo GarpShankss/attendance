@@ -77,13 +77,19 @@ READONLY_FIELDS = {
 
 # Aliases for common variations in uploaded sheets
 ALIASES = {
-    "working_days": ["Basic Days", "Working Days"],
+    "working_days": ["Basic Days", "Working Days", "FIXED - Working Days"],
     "present_days": ["Actual Days", "Present Days"],
     "pay_days":     ["Actual Days", "Pay Days"],
-    "fixed_bonus":  ["FIXED - STATUORY BONUS", "FIXED - STATUTORY BONUS", "FIXED - Bonus", "Bonus", "FIXED - Bonus @8.33%"],
-    "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes"],
-    "fixed_tshirt": ["T SHIRT", "T-Shirt"],
-    "fixed_service_charge": ["SERVICE CHARGES", "Service Charge"],
+    "fixed_basic":  ["BASIC", "Basic", "Fixed Basic", "FIXED - Basic"],
+    "fixed_da":     ["DA", "D.A", "Fixed DA", "FIXED - DA", "D.A."],
+    "fixed_hra":    ["HRA", "H.R.A", "Fixed HRA", "FIXED - HRA", "H.R.A."],
+    "fixed_bonus":  ["STATUORY BONUS", "STATUTORY BONUS", "Bonus", "Bonus @8.33%", "FIXED - STATUORY BONUS", "FIXED - STATUTORY BONUS", "FIXED - Bonus", "FIXED - Bonus @8.33%"],
+    "fixed_leave":  ["Leave With wages", "Leave wages", "Leave", "FIXED - Leave With wages"],
+    "fixed_other":  ["Other Allows", "Other Allowance", "Others", "FIXED - Other Allows"],
+    "fixed_total":  ["Total", "Gross", "Total Fixed", "FIXED - Total"],
+    "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes"],
+    "fixed_tshirt": ["T SHIRT", "T-Shirt", "CONTRIBUTION - T Shirt"],
+    "fixed_service_charge": ["SERVICE CHARGES", "Service Charge", "CONTRIBUTION - Service Charge"],
 }
 
 def R(v):
