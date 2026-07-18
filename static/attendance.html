@@ -89,8 +89,12 @@
   table.att th { position: sticky; top: 0; z-index: 10; font-weight: 600; background: #f8fafc; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-bottom: 2px solid var(--border); }
   
   /* Sticky Columns */
-  table.att td.emp-info { position: sticky; left: 0; z-index: 11; background: var(--surface); text-align: left; min-width: 150px; border-right: 2px solid var(--border); font-weight: 500; box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
-  table.att th.emp-info-th { position: sticky; left: 0; z-index: 12; background: #f8fafc; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  table.att td.sticky-col { position: sticky; z-index: 11; background: var(--surface); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  table.att th.sticky-col { position: sticky; z-index: 12; background: #fef3c7 !important; box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  
+  .att-col-action { left: 0; min-width: 70px; max-width: 70px; }
+  .att-col-id { left: 70px; min-width: 90px; max-width: 90px; }
+  .att-col-name { left: 160px; min-width: 140px; max-width: 140px; border-right: 2px solid var(--border) !important; }
   
   /* Attendance Status Colors */
   table.att input.day-inp { width: 36px; height: 36px; text-align: center; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; text-transform: uppercase; font-weight: 600; background: var(--surface); color: var(--text); padding: 0; display: inline-flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
@@ -361,9 +365,9 @@ function renderTable(employees) {
       <th colspan="7" style="background:#fef3c7; color:#92400e; text-align:center;">Summary</th>
     </tr>
     <tr>
-      <th style="min-width:70px; background:#fef3c7; color:#92400e;">Action</th>
-      <th style="min-width:90px; background:#fef3c7; color:#92400e;">ID</th>
-      <th style="min-width:140px; background:#fef3c7; color:#92400e;">Name</th>
+      <th class="sticky-col att-col-action" style="color:#92400e;">Action</th>
+      <th class="sticky-col att-col-id" style="color:#92400e;">ID</th>
+      <th class="sticky-col att-col-name" style="color:#92400e;">Name</th>
       <th style="min-width:120px; background:#fef3c7; color:#92400e;">Department</th>
       <th style="min-width:120px; background:#fef3c7; color:#92400e;">Designation</th>`;
 
@@ -395,16 +399,16 @@ function renderTable(employees) {
   let body = '<tbody>';
   for (const emp of employees) {
     body += `<tr data-emp-id="${esc(emp.emp_id)}" data-working-days="${emp.working_days || 0}" data-working-source="${esc(emp.working_source || 'Unknown')}">`;
-    body += `<td>
+    body += `<td class="sticky-col att-col-action">
       <div style="display:flex; gap:4px; justify-content:center;">
         <button class="btn-att-save" onclick="saveAttendanceEmployee('${esc(emp.emp_id)}')">Save</button>
         <button class="btn-att-delete" onclick="deleteAttendanceEmployee('${esc(emp.emp_id)}')">Del</button>
       </div>
     </td>`;
-    body += `<td class="emp-info">${esc(emp.emp_id)}</td>`;
-    body += `<td class="emp-info">${esc(emp.emp_name)}</td>`;
-    body += `<td class="emp-info">${esc(emp.department || '')}</td>`;
-    body += `<td class="emp-info">${esc(emp.designation || '')}</td>`;
+    body += `<td class="sticky-col att-col-id">${esc(emp.emp_id)}</td>`;
+    body += `<td class="sticky-col att-col-name" style="font-weight:500;">${esc(emp.emp_name)}</td>`;
+    body += `<td>${esc(emp.department || '')}</td>`;
+    body += `<td>${esc(emp.designation || '')}</td>`;
     
     let working = 0, present = emp.present_days || 0, absent = emp.absent_days || 0;
     let dayCells = '';

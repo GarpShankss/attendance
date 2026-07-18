@@ -131,11 +131,12 @@
   
   /* Sticky Columns */
   .sticky-col { position: sticky; z-index: 11; background: var(--surface); }
-  .actions-col { left: 0; min-width: 200px; max-width: 200px; border-right: 2px solid var(--border); }
-  .emp-id-col { left: 200px; min-width: 120px; max-width: 120px; border-right: 1px solid var(--border); }
-  .emp-name-col { left: 320px; min-width: 160px; max-width: 160px; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  .slno-col { left: 0; min-width: 50px; max-width: 50px; border-right: 1px solid var(--border); text-align: center; }
+  .actions-col { left: 50px; min-width: 200px; max-width: 200px; border-right: 2px solid var(--border); }
+  .emp-id-col { left: 250px; min-width: 120px; max-width: 120px; border-right: 1px solid var(--border); }
+  .emp-name-col { left: 370px; min-width: 160px; max-width: 160px; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
   
-  th.actions-col, th.emp-id-col, th.emp-name-col { z-index: 21; }
+  th.slno-col, th.actions-col, th.emp-id-col, th.emp-name-col { z-index: 21; }
   
   /* Hover effects */
   tbody tr:nth-child(even) td { background: #f9fafb; }
@@ -673,7 +674,7 @@ function renderDataTable(columns, rows) {
     { name: "Net Pay", cols: ["Net Pay"] }
   ];
 
-  let head1 = '<tr><th rowspan="2" class="sticky-col actions-col group-header">Actions</th>';
+  let head1 = '<tr><th rowspan="2" class="sticky-col slno-col group-header">#</th><th rowspan="2" class="sticky-col actions-col group-header">Actions</th>';
   let head2 = '<tr>';
 
   const allColumns = [];
@@ -724,7 +725,8 @@ function renderDataTable(columns, rows) {
         }
     }
 
-    let tr = `<tr data-collection="${escapeAttr(r._collection)}" data-row-id="${r._row_id}" data-obj-id="${r._id || ''}" data-row-key="${escapeAttr(rowKey)}">
+    let tr = `<tr data-row-key="${escapeAttr(rowKey)}" data-collection="${escapeAttr(r._collection)}" data-obj-id="${escapeAttr(r._id || '')}" data-row-id="${escapeAttr(r._row_id)}">
+      <td class="sticky-col slno-col" style="text-align:center; font-weight:600; color:var(--text-muted);">${i + 1}</td>
       <td class="sticky-col actions-col cell-actions">${actionButtons}</td>`;
 
     allColumns.forEach(c => {
