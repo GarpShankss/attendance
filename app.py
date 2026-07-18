@@ -52,7 +52,8 @@ from whatsapp_utils import send_payslip_whatsapp
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "payroll_db")
 
-client = MongoClient(MONGO_URI)
+import certifi
+client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
 db = client[DB_NAME]
 
 app = FastAPI()
