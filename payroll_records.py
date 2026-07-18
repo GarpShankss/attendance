@@ -75,8 +75,8 @@ def generate_monthly_payroll(month: int, year: int,
             fixed_wd = float(fixed_wd)
         except (ValueError, TypeError):
             fixed_wd = None
-            
-        present, absent, pay, lop, wd = _calc_attendance(emp["emp_id"], emp["location"], emp["warehouse"], month, year, full_days, fixed_wd, db=db)
+        doj_str = emp.get("DOJ")
+        present, absent, pay, lop, wd = _calc_attendance(emp["emp_id"], emp["location"], emp["warehouse"], month, year, full_days, fixed_wd, doj_str=doj_str)
 
         attendance = {
             "ATTENDANCE - Present Days": present,
