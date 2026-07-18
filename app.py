@@ -55,6 +55,8 @@ DB_NAME = os.environ.get("DB_NAME", "payroll_db")
 import certifi
 if MONGO_URI.startswith("mongodb+srv://"):
     client = MongoClient(MONGO_URI, tlsCAFile=certifi.where())
+else:
+    client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 
 app = FastAPI()
@@ -1209,8 +1211,8 @@ def save_attendance(location: str, warehouse: str, emp_id: str,
             fixed_wd = float(fixed_wd)
         except (ValueError, TypeError):
             fixed_wd = None
-            
-        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, db=db)
+        doj_str = row.get("DOJ") or row.get("identity", {}).get("DOJ")
+        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, doj_str=doj_str)
         
         row["ATTENDANCE - Present Days"] = present_days
         row["ATTENDANCE - Pay Days"] = pay_days
@@ -1281,15 +1283,17 @@ def get_attendance_employees(location: str, warehouse: str, month: int, year: in
     query = {"status": "active", "location": location, "warehouse": warehouse}
     masters = list(db["employee_master"].find(query, {"_id": 0}).sort("emp_id", 1))
 
+    # Fetch all attendance records for this location/warehouse in a single query
+    att_cursor = db[ATTENDANCE_COLL].find(
+        {"location": location, "warehouse": warehouse},
+        {"_id": 0, "emp_id": 1, "days": 1}
+    )
+    att_map = {doc["emp_id"]: doc.get("days", {}) for doc in att_cursor}
+
     employees = []
     for emp in masters:
         emp_id = emp["emp_id"]
-        att = db[ATTENDANCE_COLL].find_one(
-            {"emp_id": emp_id, "location": location, "warehouse": warehouse},
-            {"_id": 0}
-        )
-        
-        full_days = att.get("days", {}) if att else {}
+        full_days = att_map.get(emp_id, {})
         
         fixed_wd = emp.get("FIXED - Working Days")
         try:
@@ -1297,7 +1301,8 @@ def get_attendance_employees(location: str, warehouse: str, month: int, year: in
         except (ValueError, TypeError):
             fixed_wd = None
             
-        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, db=db)
+        doj_str = emp.get("DOJ")
+        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, doj_str=doj_str)
         
         employees.append({
             "emp_id":       emp_id,

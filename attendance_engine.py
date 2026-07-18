@@ -18,7 +18,7 @@ def get_payroll_dates(month: int, year: int):
         dates.append(f"{year}-{month:02d}-{d:02d}")
     return dates
 
-def _calc_attendance(emp_id: str, location: str, warehouse: str, month: int, year: int, full_days: dict, fixed_working_days: float = None, db=None):
+def _calc_attendance(emp_id: str, location: str, warehouse: str, month: int, year: int, full_days: dict, fixed_working_days: float = None, doj_str: str = None):
     cfg = get_config()
     policy = cfg.get("attendance_policy", {})
     configured_wd = cfg.get("working_days", 0)
@@ -37,16 +37,14 @@ def _calc_attendance(emp_id: str, location: str, warehouse: str, month: int, yea
     lop = 0.0
     
     doj_date = None
-    if db is not None:
-        master = db["employee_master"].find_one({"emp_id": emp_id, "location": location, "warehouse": warehouse})
-        if master and master.get("DOJ"):
-            doj_str = master.get("DOJ").strip()
-            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d %B %Y"):
-                try:
-                    doj_date = datetime.strptime(doj_str, fmt).date()
-                    break
-                except ValueError:
-                    continue
+    if doj_str:
+        doj_str = doj_str.strip()
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d %B %Y"):
+            try:
+                doj_date = datetime.strptime(doj_str, fmt).date()
+                break
+            except ValueError:
+                continue
                 
     for d_str in period_dates:
         if doj_date:
