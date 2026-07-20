@@ -313,6 +313,9 @@ def recalculate(row: dict) -> dict:
     earned_hra = R(fixed_hra / working_days * pay_days)
     L(f"  Earned HRA    = ROUND({fixed_hra} / {working_days} × {pay_days}, 0)"
       f"  = ROUND({fixed_hra / working_days * pay_days:.4f}, 0)  = {earned_hra}")
+      
+    earned_ot = get(r, "earned_ot")
+    L(f"  Earned OT Amount = {earned_ot}")
     L("")
 
     # ── Total Earnings ───────────────────────────────────────────────────────
@@ -356,11 +359,25 @@ def recalculate(row: dict) -> dict:
     L("")
 
     # ── PT ───────────────────────────────────────────────────────────────────
-    pt = pt_amount if total_earnings >= pt_threshold else 0
+    loc = str(r.get("Location") or r.get("location") or r.get("_location") or "").lower()
+    
+    if "hyderabad" in loc:
+        if total_earnings >= 20000:
+            pt = 200
+        elif total_earnings >= 15000:
+            pt = 150
+        else:
+            pt = 0
+        L("── PROFESSIONAL TAX (Hyderabad Logic) ──")
+        L(f"  Total Earnings {total_earnings} (>=20k: 200, >=15k: 150) -> PT = {pt}")
+    else:
+        pt = pt_amount if total_earnings >= pt_threshold else 0
+        L("── PROFESSIONAL TAX  [IF(Total >= threshold, PT amount, 0)] ──")
+        L(f"  Total Earnings {total_earnings} >= PT threshold {pt_threshold}? → {total_earnings >= pt_threshold}")
+        
     if COLUMN_MAP.get("ded_pt") in overrides:
         pt = get(r, "ded_pt", pt)
-    L("── PROFESSIONAL TAX  [IF(Total >= threshold, PT amount, 0)] ──")
-    L(f"  Total Earnings {total_earnings} >= PT threshold {pt_threshold}? → {total_earnings >= pt_threshold}")
+        
     L(f"  PT = {pt}")
     L("")
 
@@ -427,6 +444,7 @@ def recalculate(row: dict) -> dict:
     L(f"  Earned Leave W/Wages  = {earned_leave}")
     L(f"  Earned Bonus          = {earned_bonus}")
     L(f"  Earned HRA            = {earned_hra}")
+    L(f"  Earned OT Amount      = {earned_ot}")
     L(f"  Total Earnings        = {total_earnings}")
     L(f"  PF                    = {pf}")
     L(f"  ESI                   = {esi}")
@@ -451,6 +469,7 @@ def recalculate(row: dict) -> dict:
     put(r, "earned_leave",    earned_leave)
     put(r, "earned_bonus",    earned_bonus)
     put(r, "earned_hra",      earned_hra)
+    put(r, "earned_ot",       earned_ot)
     put(r, "earned_total",    total_earnings)
     put(r, "pf",              pf)
     put(r, "esi",             esi)

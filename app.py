@@ -626,7 +626,12 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
         'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
         'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 
         'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - OT Amount', 'EARNING - Total',
-        'Net Pay'
+        'Net Pay',
+        'Deductions - PF 12%', 'Deductions - ESIC 0.75%', 'Deductions - PT', 'Deductions - Adv', 'Deductions - Total Deduction',
+        'CONTRIBUTION - EPF @ 13%', 'CONTRIBUTION - ESIC @ 3.25%', 'CONTRIBUTION - Total Employer Contribution',
+        'CONTRIBUTION - CTC', 'CONTRIBUTION - Service Charge', 'CONTRIBUTION - Uniform Charges',
+        'CONTRIBUTION - T Shirt', 'CONTRIBUTION - Shoes', 'CONTRIBUTION - Total CTC',
+        'CONTRIBUTION - GST @18%', 'CONTRIBUTION - Total Billing'
     }
 
     # 1. Apply editable fields from payload to base
