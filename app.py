@@ -1181,8 +1181,13 @@ def get_attendance(collection: str, month: int, year: int):
 
 def _ensure_payroll_record(emp_id: str, location: str, warehouse: str,
                            month: int, year: int):
-    payroll_key = {"emp_id": emp_id, "location": location,
-                   "warehouse": warehouse, "month": month, "year": year}
+    payroll_key = {
+        "emp_id": {"$regex": f"^{emp_id}$", "$options": "i"},
+        "location": {"$regex": f"^{location}$", "$options": "i"},
+        "warehouse": {"$regex": f"^{warehouse}$", "$options": "i"},
+        "month": month, 
+        "year": year
+    }
     payroll_doc = db["payroll_records"].find_one(payroll_key)
     if payroll_doc:
         return payroll_doc

@@ -329,8 +329,9 @@ def recalculate(row: dict) -> dict:
     # ── PF ───────────────────────────────────────────────────────────────────
     warehouse = str(r.get("warehouse", "")).strip().lower()
     if warehouse == "abb":
-        pf_base = min(earned_basic + earned_da, pf_ceiling)
-        L(f"  Warehouse is ABB. Capping PF Base at {pf_ceiling}.")
+        prorated_pf_ceiling = R(pf_ceiling / working_days * pay_days)
+        pf_base = min(earned_basic + earned_da, prorated_pf_ceiling)
+        L(f"  Warehouse is ABB. Capping PF Base at {prorated_pf_ceiling} (prorated from {pf_ceiling}).")
     else:
         pf_base = earned_basic + earned_da
         L(f"  Warehouse is not ABB. No cap on PF Base.")
