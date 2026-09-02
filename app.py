@@ -625,7 +625,7 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
     FRONTEND_READONLY = {
         'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
         'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 
-        'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - OT Amount', 'EARNING - Total',
+        'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - Total',
         'Net Pay',
         'Deductions - PF 12%', 'Deductions - ESIC 0.75%', 'Deductions - PT', 'Deductions - Adv', 'Deductions - Total Deduction',
         'CONTRIBUTION - EPF @ 13%', 'CONTRIBUTION - ESIC @ 3.25%', 'CONTRIBUTION - Total Employer Contribution',
@@ -782,7 +782,7 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
         ]),
         ("Earned", [
             ("Basic", "EARNING - Basic"), ("DA", "EARNING - DA"), ("Other Allows", "EARNING - Other Allows"), ("Leave With wages", "EARNING - Leave With wages"),
-            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("HRA", "EARNING - HRA"), ("OT Amount", "EARNING - OT Amount"), ("Total", "EARNING - Total")
+            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("HRA", "EARNING - HRA"), ("OT", "EARNING - OT Amount"), ("Total", "EARNING - Total")
         ]),
         ("Deductions", [
             ("PF 12%", "Deductions - PF 12%"), ("ESIC 0.75%", "Deductions - ESIC 0.75%"), ("PT", "Deductions - PT"), ("Adv", "Deductions - Adv"),

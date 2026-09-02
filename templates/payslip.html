@@ -298,9 +298,9 @@
   <table class="ot-section">
     <tr>
       <td style="width: 28%; font-weight: bold;">OT Hrs</td>
-      <td style="width: 30%; text-align: center;"></td>
+      <td style="width: 30%; text-align: center;">{{ "%.1f"|format(emp.ot_hours) if emp and emp.ot_hours else "" }}</td>
       <td style="width: 28%; font-weight: bold;">OT Cost</td>
-      <td style="width: 14%; text-align: center;"></td>
+      <td style="width: 14%; text-align: center;">{{ "%.0f"|format(emp.earned_ot) if emp and emp.earned_ot else "" }}</td>
     </tr>
   </table>
 

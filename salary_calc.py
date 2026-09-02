@@ -90,6 +90,7 @@ ALIASES = {
     "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes"],
     "fixed_tshirt": ["T SHIRT", "T-Shirt", "CONTRIBUTION - T Shirt"],
     "fixed_service_charge": ["SERVICE CHARGES", "Service Charge", "CONTRIBUTION - Service Charge"],
+    "earned_ot":    ["OT", "O.T", "O.T.", "OT Amount", "OT AMOUNT", "Earned OT", "EARNING - OT", "EARNING - OT Amount", "EARNING - OT AMOUNT", "Overtime", "Over Time", "Overtime Amount", "OT Pay", "EARNING - Overtime", "ot"],
     "ACCOUNT":      ["Account No", "A/C No", "Bank Account", "Account Number", "A/c Number", "A/C", "Bank A/c", "ACCOUNT"],
     "IFSC":         ["IFSC Code", "IFSC", "IFSC CODE", "NEFT IFSC Code"],
 }
@@ -209,6 +210,18 @@ def put(row: dict, field: str, value):
             if field == 'net_pay' and k.lower() == 'net pay':
                 row['net_pay'] = value
             return
+    # Check if key exists in row under an alias
+    if field in ALIASES:
+        for k in row:
+            k_norm = _re.sub(r'[\s]+', ' ', str(k)).strip().lower()
+            if any(k_norm == a.lower() for a in ALIASES[field]):
+                row[k] = value
+                return
+
+    # For earned_ot: if value is 0/empty/None and no OT column was present, DO NOT create a column!
+    if field == "earned_ot" and (not value or value == 0):
+        return
+
     # create missing output field if it was not already present
     row[col] = value
     if field == 'net_pay':
@@ -240,7 +253,7 @@ def recalculate(row: dict) -> dict:
 
     working_days = get(r, "working_days") or 30
     present_days = get(r, "present_days")
-    pay_days     = present_days
+    pay_days     = get(r, "pay_days") or present_days
     if working_days <= 0:
         working_days = 30
 
@@ -319,19 +332,19 @@ def recalculate(row: dict) -> dict:
     L("")
 
     # ── Total Earnings ───────────────────────────────────────────────────────
-    total_earnings = R(earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra)
+    total_earnings = R(earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra + earned_ot)
     L("── TOTAL EARNINGS  [ROUND(sum of earned components, 0)] ────")
-    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_leave} + {earned_bonus} + {earned_hra}, 0)")
-    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra}, 0)")
+    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_leave} + {earned_bonus} + {earned_hra} + {earned_ot}, 0)")
+    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra + earned_ot}, 0)")
     L(f"  = {total_earnings}")
     L("")
 
     # ── PF ───────────────────────────────────────────────────────────────────
     warehouse = str(r.get("warehouse", "")).strip().lower()
-    if warehouse == "abb":
+    if warehouse.startswith("abb") or "abb" in warehouse:
         prorated_pf_ceiling = R(pf_ceiling / working_days * pay_days)
         pf_base = min(earned_basic + earned_da, prorated_pf_ceiling)
-        L(f"  Warehouse is ABB. Capping PF Base at {prorated_pf_ceiling} (prorated from {pf_ceiling}).")
+        L(f"  Warehouse is ABB ({warehouse}). Capping PF Base at {prorated_pf_ceiling} (prorated from {pf_ceiling}).")
     else:
         pf_base = earned_basic + earned_da
         L(f"  Warehouse is not ABB. No cap on PF Base.")
@@ -492,6 +505,7 @@ def recalculate(row: dict) -> dict:
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     test_row = {
+        "warehouse":                      "ABB(nelamangla)",
         "FIXED - Working Days":           30,
         "ATTENDANCE - Pay Days":          28,
         "FIXED - Basic":                  13354,
@@ -527,16 +541,16 @@ if __name__ == "__main__":
         "EARNING - Leave With wages":    964,
         "EARNING - Bonus @8.33%":        1392,
         "EARNING - Total":               23603,
-        "Deductions - PF 12%":           1800,
+        "Deductions - PF 12%":           1680,
         "Deductions - ESIC 0.75%":       0,
         "Deductions - PT":               0,
-        "Deductions - Total Deduction":  1800,
-        "Net Pay":                       21803,
-        "CONTRIBUTION - EPF @ 13%":      1950,
-        "CONTRIBUTION - Total CTC":      26356,
+        "Deductions - Total Deduction":  1680,
+        "Net Pay":                       21923,
+        "CONTRIBUTION - EPF @ 13%":      1820,
+        "CONTRIBUTION - Total CTC":      26273,
     }
 
-    print("=== Salary Calc Self-Test ===")
+    print("=== Salary Calc Self-Test (ABB) ===")
     all_ok = True
     for col, expected in checks.items():
         got = result.get(col)
@@ -544,4 +558,21 @@ if __name__ == "__main__":
         print(f"  {col}: {status}")
         if got != expected:
             all_ok = False
-    print("PASS" if all_ok else "Some values differ — check rounding.")
+
+    # Test with OT column
+    test_row_ot = dict(test_row)
+    test_row_ot["OT"] = 1500
+    result_ot = recalculate(test_row_ot)
+    print("\n=== Salary Calc Self-Test (With OT 1500) ===")
+    ot_checks = {
+        "EARNING - Total": 23603 + 1500,
+        "Net Pay": 25103 - 1680 - 200,  # Crosses 25k threshold, so PT=200 applies
+    }
+    for col, expected in ot_checks.items():
+        got = result_ot.get(col)
+        status = "OK" if got == expected else f"FAIL (got {got}, expected {expected})"
+        print(f"  {col}: {status}")
+        if got != expected:
+            all_ok = False
+
+    print("\nPASS" if all_ok else "\nSome values differ — check rounding.")

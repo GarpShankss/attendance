@@ -6,10 +6,10 @@ at request time via GET /warehouses - nothing is hardcoded in the frontend.
 LOCATIONS = {
     "Hyderabad": [
         "Havells", "Sony", "APL", "Unicharm", "TPT",
-        "Idemitsu", "Daikin", "Mitsubishi", "Schindler",
+        "Idemitsu", "Daikin", "Mitsubishi", "Schneider",
     ],
     "Bangalore": [
-        "APL", "Havells", "Sony", "Unicharm", "Bajaj", "ABB",
+        "APL", "Havells", "Sony", "Unicharm", "Bajaj", "abb(nelamangla)", "abb(HANCHIPURA)",
         "Bosch", "LG", "TPT", "Shaw Floor", "Haier",
     ],
 }

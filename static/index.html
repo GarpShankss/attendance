@@ -553,7 +553,7 @@ if (document.getElementById('downloadPayrollBtn')) document.getElementById('down
 
 const NON_EDITABLE_COLUMNS = new Set([
   'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
-  'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - OT Amount', 'EARNING - Total',
+  'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - Total',
   'Net Pay'
 ]);
 
@@ -667,7 +667,7 @@ function renderDataTable(columns, rows) {
     { name: "Employee Details", cols: ["emp_id", "Employee Name", "location", "warehouse", "Designation", "Department", "Active Status", "DOJ", "ACCOUNT", "Bank Name", "IFSC", "UAN", "ESIC", "PAN", "Email", "Mobile Number"] },
     { name: "Fixed", cols: ["FIXED - Working Days", "FIXED - Basic", "FIXED - DA", "FIXED - Other Allows", "FIXED - Leave With wages", "FIXED - Bonus @8.33%", "FIXED - HRA", "FIXED - Total"] },
     { name: "Attendance", cols: ["ATTENDANCE - Present Days", "ATTENDANCE - Holi day", "ATTENDANCE - Pay Days", "ATTENDANCE - OT Hours"] },
-    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - Other Allows", "EARNING - Leave With wages", "EARNING - Bonus @8.33%", "EARNING - HRA", "EARNING - OT Amount", "EARNING - Total"] },
+    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - Other Allows", "EARNING - Leave With wages", "EARNING - Bonus @8.33%", "EARNING - HRA", "EARNING - OT Amount", "EARNING - OT", "OT", "EARNING - Total"] },
     { name: "Deductions", cols: ["Deductions - PF 12%", "Deductions - ESIC 0.75%", "Deductions - PT", "Deductions - Adv", "Deductions - Total Deduction"] },
     { name: "Employer Contribution", cols: ["CONTRIBUTION - EPF @ 13%", "CONTRIBUTION - ESIC @ 3.25%", "CONTRIBUTION - Total Employer Contribution"] },
     { name: "CTC", cols: ["CONTRIBUTION - CTC", "CONTRIBUTION - Service Charge", "CONTRIBUTION - Uniform Charges", "CONTRIBUTION - T Shirt", "CONTRIBUTION - Shoes", "CONTRIBUTION - Total CTC"] },
@@ -687,6 +687,7 @@ function renderDataTable(columns, rows) {
     validCols.forEach(c => {
       allColumns.push(c);
       let shortName = c.replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", "");
+      if (shortName === 'OT Amount') shortName = 'OT';
       
       let extraClass = 'sub-header';
       if(g.name === 'Employee Details') {
