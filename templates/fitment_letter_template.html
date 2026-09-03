@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 15mm 15mm 15mm;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Verdana', Geneva, Tahoma, sans-serif;
+    color: #000;
+    margin: 0;
+    padding: 10px 20px;
+    font-size: 11pt;
+    line-height: 1.4;
+    background: #fff;
+  }
+  .container {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .header-logo {
+    text-align: center;
+    margin-bottom: 5px;
+  }
+  .header-logo img {
+    max-height: 55px;
+  }
+  .company-title {
+    text-align: center;
+    font-size: 16pt;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+  .doc-title-box {
+    text-align: center;
+    font-size: 12pt;
+    font-weight: bold;
+    padding: 6px;
+    border: 1.5px solid #000;
+    margin-bottom: 20px;
+    background-color: #f8fafc;
+  }
+  .info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 11pt;
+  }
+  .info-table td {
+    padding: 5px 4px;
+    vertical-align: middle;
+  }
+  .info-table td.lbl {
+    font-weight: normal;
+    width: 38%;
+  }
+  .info-table td.val {
+    font-weight: bold;
+    border-bottom: 1px dotted #888;
+    width: 62%;
+  }
+  .salary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 25px;
+    font-size: 11pt;
+  }
+  .salary-table th, .salary-table td {
+    border: 1px solid #333;
+    padding: 6px 12px;
+  }
+  .salary-table th {
+    background-color: #f1f5f9;
+    font-weight: bold;
+    text-align: center;
+    font-size: 11.5pt;
+  }
+  .salary-table th.particulars-col {
+    text-align: left;
+    width: 48%;
+  }
+  .salary-table th.year-col {
+    width: 26%;
+  }
+  .salary-table td.num {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .salary-table tr.highlight-row {
+    font-weight: bold;
+    background-color: #f8fafc;
+  }
+  .consent-section {
+    font-size: 10.5pt;
+    margin-top: 15px;
+    margin-bottom: 25px;
+    line-height: 1.6;
+  }
+  .bonus-note {
+    font-size: 10.5pt;
+    font-weight: normal;
+    margin-top: 6px;
+  }
+  .sign-section {
+    width: 100%;
+    margin-top: 35px;
+    font-size: 11pt;
+  }
+  .sign-section table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .sign-section td {
+    padding: 8px 0;
+    vertical-align: bottom;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  {% if logo_base64 %}
+  <div class="header-logo">
+    <img src="data:image/png;base64,{{ logo_base64 }}" alt="Logo" />
+  </div>
+  {% endif %}
+
+  <div class="company-title">{{ company_name }}</div>
+  <div class="doc-title-box">SALARY FITMENT LETTER</div>
+
+  <table class="info-table">
+    <tr>
+      <td class="lbl">Name:</td>
+      <td class="val">{{ emp_name }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Designation:</td>
+      <td class="val">{{ designation }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Department:</td>
+      <td class="val">{{ department }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Emp Code No:</td>
+      <td class="val">{{ emp_id }}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Date of Joining:</td>
+      <td class="val">{{ doj }}</td>
+    </tr>
+  </table>
+
+  <table class="salary-table">
+    <thead>
+      <tr>
+        <th class="particulars-col">Particulars</th>
+        <th class="year-col">{{ prev_year_label }}</th>
+        <th class="year-col">{{ new_year_label }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Basic</td>
+        <td class="num">{{ "%.0f"|format(prev.basic) }}</td>
+        <td class="num">{{ "%.0f"|format(new.basic) }}</td>
+      </tr>
+      <tr>
+        <td>Da</td>
+        <td class="num">{{ "%.0f"|format(prev.da) }}</td>
+        <td class="num">{{ "%.0f"|format(new.da) }}</td>
+      </tr>
+      <tr>
+        <td>HRA</td>
+        <td class="num">{{ "%.0f"|format(prev.hra) }}</td>
+        <td class="num">{{ "%.0f"|format(new.hra) }}</td>
+      </tr>
+      <tr>
+        <td>Status Bonus</td>
+        <td class="num">{{ "%.2f"|format(prev.bonus) }}</td>
+        <td class="num">{{ "%.2f"|format(new.bonus) }}</td>
+      </tr>
+      <tr class="highlight-row">
+        <td>Gross Take Home</td>
+        <td class="num">{{ "%.2f"|format(prev.gross) }}</td>
+        <td class="num">{{ "%.2f"|format(new.gross) }}</td>
+      </tr>
+      <tr>
+        <td>PF deduction 12%</td>
+        <td class="num">{{ "%.2f"|format(prev.pf_employee) }}</td>
+        <td class="num">{{ "%.2f"|format(new.pf_employee) }}</td>
+      </tr>
+      <tr>
+        <td>ESIC 0.75%</td>
+        <td class="num">{{ "%.2f"|format(prev.esic_employee) }}</td>
+        <td class="num">{{ "%.2f"|format(new.esic_employee) }}</td>
+      </tr>
+      <tr>
+        <td>PT</td>
+        <td class="num">{{ "%.0f"|format(prev.pt) }}</td>
+        <td class="num">{{ "%.0f"|format(new.pt) }}</td>
+      </tr>
+      <tr class="highlight-row">
+        <td>Net Take Home</td>
+        <td class="num">{{ "%.2f"|format(prev.net_take_home) }}</td>
+        <td class="num">{{ "%.2f"|format(new.net_take_home) }}</td>
+      </tr>
+      <tr class="highlight-row">
+        <td>Total Monthly Take Home</td>
+        <td class="num">{{ "%.2f"|format(prev.monthly_take_home) }}</td>
+        <td class="num">{{ "%.2f"|format(new.monthly_take_home) }}</td>
+      </tr>
+      <tr>
+        <td>PF 13%</td>
+        <td class="num">{{ "%.2f"|format(prev.pf_employer) }}</td>
+        <td class="num">{{ "%.2f"|format(new.pf_employer) }}</td>
+      </tr>
+      <tr>
+        <td>ESIC 3.25%</td>
+        <td class="num">{{ "%.2f"|format(prev.esic_employer) }}</td>
+        <td class="num">{{ "%.2f"|format(new.esic_employer) }}</td>
+      </tr>
+      <tr class="highlight-row">
+        <td>Final CTC</td>
+        <td class="num">{{ "%.2f"|format(prev.final_ctc) }}</td>
+        <td class="num">{{ "%.2f"|format(new.final_ctc) }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="consent-section">
+    <div>I <strong>{{ emp_name if emp_name else '____________________' }}</strong> agree to the above salary fitment with my full consent and accept the Increment Letter.</div>
+    <div class="bonus-note">Bonus will be add in your monthly salary.</div>
+  </div>
+
+  <div class="sign-section">
+    <table>
+      <tr>
+        <td style="width: 50%;">
+          <div>Place: {{ location }}</div>
+          <div style="margin-top: 8px;">Date - {{ date_str }}</div>
+        </td>
+        <td style="width: 50%; text-align: right;">
+          <div style="margin-bottom: 40px;"></div>
+          <div style="font-weight: bold; border-top: 1px solid #333; display: inline-block; padding-top: 4px; width: 140px; text-align: center;">Signature</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>

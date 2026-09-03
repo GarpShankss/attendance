@@ -261,11 +261,19 @@
       </tr>
 
       <tr>
+        <td class="desc">Special Allowance</td>
+        <td class="amount">{{ "%.0f"|format(emp.fixed_spl|default(0)) }}</td>
+        <td class="amount">{{ "%.0f"|format(emp.earned_spl|default(0)) }}</td>
+        <td class="desc">Advance</td>
+        <td class="amount">{{ "%.0f"|format(emp.advance|default(0)) }}</td>
+      </tr>
+
+      <tr>
         <td class="desc">Leave With Wages</td>
         <td class="amount">{{ "%.0f"|format(emp.fixed_leave|default(0)) }}</td>
         <td class="amount">{{ "%.0f"|format(emp.earned_leave|default(0)) }}</td>
-        <td class="desc">Advance</td>
-        <td class="amount">{{ "%.0f"|format(emp.advance|default(0)) }}</td>
+        <td class="desc"></td>
+        <td class="amount"></td>
       </tr>
 
       <tr>

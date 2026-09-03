@@ -1,9 +1,24 @@
 import os
 import datetime
 import tempfile
+
+if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+    win_path = r"C:\Users\Sellogs\AppData\Local\ms-playwright"
+    if os.path.exists(win_path):
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = win_path
+
 from jinja2 import Environment, FileSystemLoader
 from playwright.sync_api import sync_playwright
 from s3_utils import upload_with_cleanup, build_pdf_filename
+
+def _launch_browser(p):
+    try:
+        return p.chromium.launch(headless=True)
+    except Exception:
+        try:
+            return p.chromium.launch(headless=True, channel="chrome")
+        except Exception:
+            return p.chromium.launch(headless=True, channel="msedge")
 
 def number_to_words(n):
     if n == 0 or n is None:
@@ -23,12 +38,14 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
     
     # Fallback to employee_master if missing
     if db is not None:
-        master = db["employee_master"].find_one({"emp_id": flat_record.get('emp_id')})
-        if master:
-            master_flat = _flatten_doc(master)
-            for k, v in master_flat.items():
-                if k not in flat_record or not flat_record[k]:
-                    flat_record[k] = v
+        emp_id = flat_record.get('emp_id') or flat_record.get('Sl No')
+        if emp_id:
+            master = db['employee_master'].find_one({'emp_id': emp_id})
+            if master:
+                master_flat = _flatten_doc(master)
+                for k, v in master_flat.items():
+                    if k not in flat_record or not flat_record[k]:
+                        flat_record[k] = v
                     
     # Employee info extraction
     emp = {
@@ -49,6 +66,7 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
         'fixed_basic': float(flat_record.get('FIXED - Basic', 0)),
         'fixed_da': float(flat_record.get('FIXED - DA', 0)),
         'fixed_other': float(flat_record.get('FIXED - Other Allows', 0)),
+        'fixed_spl': float(flat_record.get('FIXED - Spl Allows', flat_record.get('FIXED - Special Allowance', 0))),
         'fixed_leave': float(flat_record.get('FIXED - Leave With wages', 0)),
         'fixed_bonus': float(flat_record.get('FIXED - Bonus @8.33%', 0)),
         'fixed_hra': float(flat_record.get('FIXED - HRA', 0)),
@@ -57,6 +75,7 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
         'earned_basic': float(flat_record.get('EARNING - Basic', 0)),
         'earned_da': float(flat_record.get('EARNING - DA', 0)),
         'earned_other': float(flat_record.get('EARNING - Other Allows', 0)),
+        'earned_spl': float(flat_record.get('EARNING - Spl Allows', flat_record.get('EARNING - Special Allowance', 0))),
         'earned_leave': float(flat_record.get('EARNING - Leave With wages', 0)),
         'earned_bonus': float(flat_record.get('EARNING - Bonus @8.33%', 0)),
         'earned_hra': float(flat_record.get('EARNING - HRA', 0)),
@@ -97,7 +116,7 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
     )
     
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = _launch_browser(p)
         page = browser.new_page()
         page.set_content(html_out, wait_until="networkidle")
         pdf_bytes = page.pdf(

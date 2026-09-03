@@ -1590,3 +1590,165 @@ def send_whatsapp_all(payload: dict = Body(...)):
                 time.sleep(0.5)
                 
     return {"status": "success", "sent": sent, "failed": failed}
+
+
+# ---------------------------------------------------------------------------
+# Salary Fitment / Increment Letter endpoints
+# ---------------------------------------------------------------------------
+from fitment_letter import (
+    calculate_fitment_side,
+    generate_fitment_excel,
+    generate_fitment_pdf,
+    send_fitment_letter_whatsapp,
+)
+
+
+@app.get("/fitment_letter/employee/{emp_id}")
+def get_fitment_employee_data(emp_id: str, location: str = None, warehouse: str = None):
+    """
+    Fetch employee details and salary history to pre-populate Fitment Letter modal.
+    """
+    query = {"emp_id": emp_id}
+    if location:
+        query["location"] = location
+    if warehouse:
+        query["warehouse"] = warehouse
+
+    master = db["employee_master"].find_one(query) or {}
+    master_flat = _flatten_doc(master) if master else {}
+
+    # Find the most recent payroll records for this employee
+    records = list(
+        db["payroll_records"]
+        .find({"emp_id": emp_id})
+        .sort([("year", -1), ("month", -1)])
+        .limit(2)
+    )
+
+    current_rec = _flatten_doc(records[0]) if records else {}
+    prev_rec = _flatten_doc(records[1]) if len(records) > 1 else {}
+
+    # Extract info with fallbacks
+    emp_name = current_rec.get("emp_name") or master_flat.get("emp_name") or current_rec.get("Employee Name") or ""
+    designation = current_rec.get("Designation") or master_flat.get("Designation") or ""
+    department = current_rec.get("Department") or current_rec.get("warehouse") or master_flat.get("warehouse") or master_flat.get("Department") or ""
+    loc = current_rec.get("location") or master_flat.get("location") or "Bangalore"
+    doj = current_rec.get("DOJ") or master_flat.get("DOJ") or ""
+    mobile = current_rec.get("mobile_number") or current_rec.get("Mobile Number") or master_flat.get("mobile_number") or master_flat.get("Mobile Number") or ""
+
+    # Current / New salary inputs
+    new_basic = float(current_rec.get("FIXED - Basic") or master_flat.get("FIXED - Basic") or 0)
+    new_da = float(current_rec.get("FIXED - DA") or master_flat.get("FIXED - DA") or 0)
+    new_hra = float(current_rec.get("FIXED - HRA") or master_flat.get("FIXED - HRA") or 0)
+
+    # Previous salary inputs (from earlier month or slightly lower if none)
+    if prev_rec:
+        prev_basic = float(prev_rec.get("FIXED - Basic") or new_basic)
+        prev_da = float(prev_rec.get("FIXED - DA") or new_da)
+        prev_hra = float(prev_rec.get("FIXED - HRA") or new_hra)
+    else:
+        prev_basic = new_basic
+        prev_da = new_da
+        prev_hra = new_hra
+
+    now = datetime.utcnow()
+    curr_yr = now.year % 100
+    prev_yr = (now.year - 1) % 100
+    prev_label = f"{prev_yr:02d}-{curr_yr:02d}"
+    next_yr = (now.year + 1) % 100
+    new_label = f"{curr_yr:02d}-{next_yr:02d}"
+
+    return {
+        "emp_id": emp_id,
+        "emp_name": emp_name,
+        "designation": designation,
+        "department": department,
+        "warehouse": department,
+        "location": loc,
+        "doj": doj,
+        "mobile_number": mobile,
+        "company_name": "RS MAN- TECH",
+        "prev_year_label": prev_label,
+        "new_year_label": new_label,
+        "prev_basic": prev_basic,
+        "prev_da": prev_da,
+        "prev_hra": prev_hra,
+        "new_basic": new_basic,
+        "new_da": new_da,
+        "new_hra": new_hra,
+    }
+
+
+@app.post("/fitment_letter/calculate")
+def calculate_fitment_endpoint(payload: dict = Body(...)):
+    loc = payload.get("location", "Bangalore")
+    wh = payload.get("warehouse", payload.get("department", ""))
+    
+    prev_calc = calculate_fitment_side(
+        basic=payload.get("prev_basic", 0),
+        da=payload.get("prev_da", 0),
+        hra=payload.get("prev_hra", 0),
+        location=loc,
+        warehouse=wh
+    )
+    new_calc = calculate_fitment_side(
+        basic=payload.get("new_basic", 0),
+        da=payload.get("new_da", 0),
+        hra=payload.get("new_hra", 0),
+        location=loc,
+        warehouse=wh
+    )
+    return {"prev": prev_calc, "new": new_calc}
+
+
+@app.post("/fitment_letter/download_excel")
+def download_fitment_excel_endpoint(payload: dict = Body(...)):
+    from urllib.parse import quote
+    try:
+        excel_bytes = generate_fitment_excel(payload)
+        emp_name = payload.get("emp_name", "Employee").replace(" ", "_")
+        filename = f"Fitment_Letter_{emp_name}_{payload.get('new_year_label', '26-27')}.xlsx"
+        
+        return StreamingResponse(
+            io.BytesIO(excel_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Excel generation failed: {str(e)}")
+
+
+@app.post("/fitment_letter/download_pdf")
+def download_fitment_pdf_endpoint(payload: dict = Body(...)):
+    from urllib.parse import quote
+    try:
+        pdf_bytes = generate_fitment_pdf(payload)
+        emp_name = payload.get("emp_name", "Employee").replace(" ", "_")
+        filename = f"Fitment_Letter_{emp_name}_{payload.get('new_year_label', '26-27')}.pdf"
+        
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"}
+        )
+    except Exception as e:
+        raise HTTPException(500, f"PDF generation failed: {str(e)}")
+
+
+@app.post("/fitment_letter/send_whatsapp")
+def send_fitment_whatsapp_endpoint(payload: dict = Body(...)):
+    mobile = payload.get("mobile_number") or payload.get("mobile")
+    if not mobile:
+        raise HTTPException(400, "Employee mobile number is required")
+        
+    try:
+        success = send_fitment_letter_whatsapp(str(mobile), payload)
+        if success:
+            return {"success": True, "message": f"Fitment Letter sent successfully to {mobile}"}
+        else:
+            raise HTTPException(500, "WhatsApp delivery failed (check logs/template)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"WhatsApp dispatch failed: {str(e)}")
+

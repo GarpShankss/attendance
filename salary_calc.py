@@ -18,6 +18,7 @@ COLUMN_MAP = {
     "fixed_basic":            "FIXED - Basic",
     "fixed_da":               "FIXED - DA",
     "fixed_other":            "FIXED - Other Allows",
+    "fixed_spl":              "FIXED - Spl Allows",
     "fixed_leave":            "FIXED - Leave With wages",
     "fixed_bonus":            "FIXED - Bonus @8.33%",
     "fixed_hra":              "FIXED - HRA",
@@ -36,6 +37,7 @@ COLUMN_MAP = {
     "earned_basic":           "EARNING - Basic",
     "earned_da":              "EARNING - DA",
     "earned_other":           "EARNING - Other Allows",
+    "earned_spl":             "EARNING - Spl Allows",
     "earned_leave":           "EARNING - Leave With wages",
     "earned_bonus":           "EARNING - Bonus @8.33%",
     "earned_hra":             "EARNING - HRA",
@@ -68,7 +70,7 @@ COLUMN_MAP = {
 
 # Fields that must never be overwritten (inputs, not outputs)
 READONLY_FIELDS = {
-    "fixed_basic", "fixed_da", "fixed_other", "fixed_leave",
+    "fixed_basic", "fixed_da", "fixed_other", "fixed_spl", "fixed_leave",
     "fixed_bonus", "fixed_hra", "fixed_total", "working_days",
     "present_days", "holiday", "pay_days", "ot_hours",
     "uniform",
@@ -84,8 +86,11 @@ ALIASES = {
     "fixed_da":     ["DA", "D.A", "Fixed DA", "FIXED - DA", "D.A."],
     "fixed_hra":    ["HRA", "H.R.A", "Fixed HRA", "FIXED - HRA", "H.R.A."],
     "fixed_bonus":  ["STATUORY BONUS", "STATUTORY BONUS", "Bonus", "Bonus @8.33%", "FIXED - STATUORY BONUS", "FIXED - STATUTORY BONUS", "FIXED - Bonus", "FIXED - Bonus @8.33%"],
-    "fixed_leave":  ["Leave With wages", "Leave wages", "Leave", "FIXED - Leave With wages"],
-    "fixed_other":  ["Other Allows", "Other Allowance", "Others", "FIXED - Other Allows"],
+    "fixed_leave":  ["Leave With wages", "Leave wages", "Leave", "FIXED - Leave With wages", "LWW", "L.W.W", "L.W.W.", "LWW Charges", "Leave With Wages"],
+    "fixed_other":  ["Other Allows", "Other Allowance", "Others", "FIXED - Other Allows", "Other", "Other Allows."],
+    "fixed_spl":    ["Special Allowance", "Special Allows", "Spl Allowance", "SPL ALLOWANCE", "Special Allowances", "FIXED - Spl Allows", "FIXED - Special Allowance", "Spl Allows"],
+    "earned_other": ["EARNING - Other Allows", "Earned Other", "Earned Other Allows"],
+    "earned_spl":   ["EARNING - Spl Allows", "Earned Special Allowance", "EARNING - Special Allowance", "Earned Spl Allows"],
     "fixed_total":  ["Total", "Gross", "Total Fixed", "FIXED - Total"],
     "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes"],
     "fixed_tshirt": ["T SHIRT", "T-Shirt", "CONTRIBUTION - T Shirt"],
@@ -218,8 +223,8 @@ def put(row: dict, field: str, value):
                 row[k] = value
                 return
 
-    # For earned_ot: if value is 0/empty/None and no OT column was present, DO NOT create a column!
-    if field == "earned_ot" and (not value or value == 0):
+    # For earned_ot / earned_spl: if value is 0/empty/None and no such column was present, DO NOT create a column!
+    if field in ("earned_ot", "earned_spl") and (not value or value == 0):
         return
 
     # create missing output field if it was not already present
@@ -261,6 +266,7 @@ def recalculate(row: dict) -> dict:
     fixed_basic = get(r, "fixed_basic")
     fixed_da    = get(r, "fixed_da")
     fixed_other = get(r, "fixed_other")
+    fixed_spl   = get(r, "fixed_spl")
     fixed_leave = get(r, "fixed_leave")
     fixed_bonus = get(r, "fixed_bonus")
     fixed_hra   = get(r, "fixed_hra")
@@ -280,6 +286,7 @@ def recalculate(row: dict) -> dict:
     L(f"  Fixed Basic           (FIXED - Basic)             = {fixed_basic}")
     L(f"  Fixed DA              (FIXED - DA)                = {fixed_da}")
     L(f"  Fixed Other Allows    (FIXED - Other Allows)      = {fixed_other}")
+    L(f"  Fixed Spl Allows      (FIXED - Spl Allows)        = {fixed_spl}")
     L(f"  Fixed Leave W/Wages   (FIXED - Leave With wages)  = {fixed_leave}")
     L(f"  Fixed Bonus           (FIXED - Bonus @8.33%)      = {fixed_bonus}")
     L(f"  Fixed HRA             (FIXED - HRA)               = {fixed_hra}")
@@ -315,6 +322,10 @@ def recalculate(row: dict) -> dict:
     L(f"  Earned Other  = ROUND({fixed_other} / {working_days} × {pay_days}, 0)"
       f"  = ROUND({fixed_other / working_days * pay_days:.4f}, 0)  = {earned_other}")
 
+    earned_spl = R(fixed_spl / working_days * pay_days)
+    L(f"  Earned Spl    = ROUND({fixed_spl} / {working_days} × {pay_days}, 0)"
+      f"  = ROUND({fixed_spl / working_days * pay_days:.4f}, 0)  = {earned_spl}")
+
     earned_leave = R(fixed_leave / working_days * pay_days)
     L(f"  Earned Leave  = ROUND({fixed_leave} / {working_days} × {pay_days}, 0)"
       f"  = ROUND({fixed_leave / working_days * pay_days:.4f}, 0)  = {earned_leave}")
@@ -332,10 +343,10 @@ def recalculate(row: dict) -> dict:
     L("")
 
     # ── Total Earnings ───────────────────────────────────────────────────────
-    total_earnings = R(earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra + earned_ot)
+    total_earnings = R(earned_basic + earned_da + earned_other + earned_spl + earned_leave + earned_bonus + earned_hra + earned_ot)
     L("── TOTAL EARNINGS  [ROUND(sum of earned components, 0)] ────")
-    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_leave} + {earned_bonus} + {earned_hra} + {earned_ot}, 0)")
-    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_leave + earned_bonus + earned_hra + earned_ot}, 0)")
+    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_spl} + {earned_leave} + {earned_bonus} + {earned_hra} + {earned_ot}, 0)")
+    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_spl + earned_leave + earned_bonus + earned_hra + earned_ot}, 0)")
     L(f"  = {total_earnings}")
     L("")
 
@@ -480,6 +491,7 @@ def recalculate(row: dict) -> dict:
     put(r, "earned_basic",    earned_basic)
     put(r, "earned_da",       earned_da)
     put(r, "earned_other",    earned_other)
+    put(r, "earned_spl",      earned_spl)
     put(r, "earned_leave",    earned_leave)
     put(r, "earned_bonus",    earned_bonus)
     put(r, "earned_hra",      earned_hra)

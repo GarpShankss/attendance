@@ -132,9 +132,9 @@
   /* Sticky Columns */
   .sticky-col { position: sticky; z-index: 11; background: var(--surface); }
   .slno-col { left: 0; min-width: 50px; max-width: 50px; border-right: 1px solid var(--border); text-align: center; }
-  .actions-col { left: 50px; min-width: 200px; max-width: 200px; border-right: 2px solid var(--border); }
-  .emp-id-col { left: 250px; min-width: 120px; max-width: 120px; border-right: 1px solid var(--border); }
-  .emp-name-col { left: 370px; min-width: 160px; max-width: 160px; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
+  .actions-col { left: 50px; min-width: 245px; max-width: 245px; border-right: 2px solid var(--border); }
+  .emp-id-col { left: 295px; min-width: 120px; max-width: 120px; border-right: 1px solid var(--border); }
+  .emp-name-col { left: 415px; min-width: 160px; max-width: 160px; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
   
   th.slno-col, th.actions-col, th.emp-id-col, th.emp-name-col { z-index: 21; }
   
@@ -155,6 +155,133 @@
   .btn-icon.generate:hover { color: var(--primary); background: var(--primary-light); }
   .btn-icon.download:hover { color: var(--success); background: #dcfce7; }
   .btn-icon.wa:hover { color: #10b981; background: #d1fae5; }
+  .btn-icon.fitment { color: #8b5cf6; }
+  .btn-icon.fitment:hover { color: #7c3aed; background: #ede9fe; }
+
+  /* Fitment Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+  }
+  .modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+  }
+  .modal-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .modal-close-btn:hover { background: #e2e8f0; color: var(--text); }
+  .modal-body {
+    padding: 18px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .fitment-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .fitment-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .fitment-box {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .fitment-box-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .fitment-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .fitment-preview-table th, .fitment-preview-table td {
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+  }
+  .fitment-preview-table th {
+    background: #f1f5f9;
+    font-weight: 600;
+    text-align: center;
+  }
+  .fitment-preview-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .fitment-preview-table tr.total-row {
+    background: #f8fafc;
+    font-weight: 700;
+  }
+  .badge-purple {
+    background: #ede9fe;
+    color: #6d28d9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-green {
+    background: #dcfce7;
+    color: #15803d;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+  }
   
   td input.cell-input { background: var(--surface); border: 1px solid var(--primary); padding: 6px 10px; border-radius: 4px; min-width: 80px; width: 100%; box-shadow: 0 0 0 2px var(--primary-light); }
   
@@ -665,9 +792,9 @@ function renderDataTable(columns, rows) {
   
   const COLUMN_GROUPS = [
     { name: "Employee Details", cols: ["emp_id", "Employee Name", "location", "warehouse", "Designation", "Department", "Active Status", "DOJ", "ACCOUNT", "Bank Name", "IFSC", "UAN", "ESIC", "PAN", "Email", "Mobile Number"] },
-    { name: "Fixed", cols: ["FIXED - Working Days", "FIXED - Basic", "FIXED - DA", "FIXED - Other Allows", "FIXED - Leave With wages", "FIXED - Bonus @8.33%", "FIXED - HRA", "FIXED - Total"] },
+    { name: "Fixed", cols: ["FIXED - Working Days", "FIXED - Basic", "FIXED - DA", "FIXED - Other Allows", "FIXED - Spl Allows", "FIXED - Leave With wages", "FIXED - Bonus @8.33%", "FIXED - HRA", "FIXED - Total"] },
     { name: "Attendance", cols: ["ATTENDANCE - Present Days", "ATTENDANCE - Holi day", "ATTENDANCE - Pay Days", "ATTENDANCE - OT Hours"] },
-    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - Other Allows", "EARNING - Leave With wages", "EARNING - Bonus @8.33%", "EARNING - HRA", "EARNING - OT Amount", "EARNING - OT", "OT", "EARNING - Total"] },
+    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - Other Allows", "EARNING - Spl Allows", "EARNING - Leave With wages", "EARNING - Bonus @8.33%", "EARNING - HRA", "EARNING - OT Amount", "EARNING - OT", "OT", "EARNING - Total"] },
     { name: "Deductions", cols: ["Deductions - PF 12%", "Deductions - ESIC 0.75%", "Deductions - PT", "Deductions - Adv", "Deductions - Total Deduction"] },
     { name: "Employer Contribution", cols: ["CONTRIBUTION - EPF @ 13%", "CONTRIBUTION - ESIC @ 3.25%", "CONTRIBUTION - Total Employer Contribution"] },
     { name: "CTC", cols: ["CONTRIBUTION - CTC", "CONTRIBUTION - Service Charge", "CONTRIBUTION - Uniform Charges", "CONTRIBUTION - T Shirt", "CONTRIBUTION - Shoes", "CONTRIBUTION - Total CTC"] },
@@ -686,7 +813,7 @@ function renderDataTable(columns, rows) {
     
     validCols.forEach(c => {
       allColumns.push(c);
-      let shortName = c.replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", "");
+      let shortName = c.replace("FIXED - ", "").replace("ATTENDANCE - ", "").replace("EARNING - ", "").replace("Deductions - ", "").replace("CONTRIBUTION - ", "");
       if (shortName === 'OT Amount') shortName = 'OT';
       
       let extraClass = 'sub-header';
@@ -717,7 +844,9 @@ function renderDataTable(columns, rows) {
         
         const deleteButton = `<button class="btn-icon delete" title="Delete" onclick="deleteEmployeeRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
         
-        actionButtons += editButton + deleteButton;
+        const fitmentButton = `<button class="btn-icon fitment" title="Salary Fitment / Increment Letter" onclick="openFitmentModal('${escapeAttr(r.emp_id || r._row_id)}', '${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><polyline points="16 13 12 9 8 13"></polyline><line x1="12" y1="9" x2="12" y2="17"></line></svg></button>`;
+
+        actionButtons += editButton + deleteButton + fitmentButton;
         
         if (r._collection === 'payroll_records' && r._id) {
             actionButtons += `<button class="btn-icon generate" title="Generate Payslip" onclick="generatePayslip('${r._id}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg></button>`;
@@ -1225,7 +1354,434 @@ loadSettings();
       }
     }
   };
+
+  // ── Fitment Letter Modal & Handlers ─────────────────────────────────────────
+  async function openFitmentModal(empId, rowKey) {
+    showLoader('Loading employee fitment data...');
+    try {
+      const loc = els.filterLocation ? els.filterLocation.value : '';
+      const wh = els.filterWarehouse ? els.filterWarehouse.value : '';
+      const params = new URLSearchParams();
+      if (loc) params.set('location', loc);
+      if (wh) params.set('warehouse', wh);
+
+      const res = await fetch(`/fitment_letter/employee/${encodeURIComponent(empId)}?` + params.toString());
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+
+      // If we clicked from a specific row in the table, also check row for latest values
+      if (rowKey) {
+        const rowObj = currentData.find(r => `${r._collection}__${r._row_id}` === rowKey || r.emp_id === empId);
+        if (rowObj) {
+          if (rowObj['FIXED - Basic']) data.new_basic = parseFloat(rowObj['FIXED - Basic']) || data.new_basic;
+          if (rowObj['FIXED - DA']) data.new_da = parseFloat(rowObj['FIXED - DA']) || data.new_da;
+          if (rowObj['FIXED - HRA']) data.new_hra = parseFloat(rowObj['FIXED - HRA']) || data.new_hra;
+          if (rowObj['Employee Name'] || rowObj.emp_name) data.emp_name = rowObj['Employee Name'] || rowObj.emp_name;
+          if (rowObj['Designation']) data.designation = rowObj['Designation'];
+          if (rowObj['Department'] || rowObj.warehouse) data.department = rowObj['Department'] || rowObj.warehouse;
+          if (rowObj['location']) data.location = rowObj['location'];
+          if (rowObj['DOJ']) data.doj = rowObj['DOJ'];
+          if (rowObj['Mobile Number'] || rowObj.mobile_number) data.mobile_number = rowObj['Mobile Number'] || rowObj.mobile_number;
+        }
+      }
+
+      // Populate Form Fields
+      document.getElementById('fit_emp_id').value = data.emp_id || empId;
+      document.getElementById('fit_emp_name').value = data.emp_name || '';
+      document.getElementById('fit_company_name').value = data.company_name || 'RS MAN- TECH';
+      document.getElementById('fit_designation').value = data.designation || '';
+      document.getElementById('fit_department').value = data.department || data.warehouse || '';
+      document.getElementById('fit_location').value = data.location || (loc || 'Bangalore');
+      document.getElementById('fit_doj').value = data.doj || '';
+      document.getElementById('fit_mobile').value = data.mobile_number || '';
+      
+      const now = new Date();
+      const d = String(now.getDate()).padStart(2, '0');
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const y = now.getFullYear();
+      document.getElementById('fit_date').value = `${d}.${m}.${y}`;
+
+      document.getElementById('fit_prev_label').value = data.prev_year_label || '25-26';
+      document.getElementById('fit_new_label').value = data.new_year_label || '26-27';
+
+      document.getElementById('fit_prev_basic').value = data.prev_basic || 0;
+      document.getElementById('fit_prev_da').value = data.prev_da || 0;
+      document.getElementById('fit_prev_hra').value = data.prev_hra || 0;
+
+      document.getElementById('fit_new_basic').value = data.new_basic || 0;
+      document.getElementById('fit_new_da').value = data.new_da || 0;
+      document.getElementById('fit_new_hra').value = data.new_hra || 0;
+
+      // Header summary badge
+      document.getElementById('fit_modal_subtitle').textContent = 
+        `${data.emp_id || empId} • ${data.emp_name || 'Employee'} • ${data.department || data.warehouse || ''} (${data.location || 'Bangalore'})`;
+
+      recalcFitmentLive();
+      document.getElementById('fitmentModal').style.display = 'flex';
+      hideLoader();
+    } catch (err) {
+      hideLoader();
+      showToast('Failed to load fitment details: ' + err.message, 'error');
+    }
+  }
+
+  function closeFitmentModal() {
+    document.getElementById('fitmentModal').style.display = 'none';
+  }
+
+  function getFitmentPayload() {
+    return {
+      emp_id: document.getElementById('fit_emp_id').value.trim(),
+      emp_name: document.getElementById('fit_emp_name').value.trim(),
+      company_name: document.getElementById('fit_company_name').value.trim(),
+      designation: document.getElementById('fit_designation').value.trim(),
+      department: document.getElementById('fit_department').value.trim(),
+      warehouse: document.getElementById('fit_department').value.trim(),
+      location: document.getElementById('fit_location').value.trim(),
+      doj: document.getElementById('fit_doj').value.trim(),
+      mobile_number: document.getElementById('fit_mobile').value.trim(),
+      date_str: document.getElementById('fit_date').value.trim(),
+      prev_year_label: document.getElementById('fit_prev_label').value.trim() || '25-26',
+      new_year_label: document.getElementById('fit_new_label').value.trim() || '26-27',
+      prev_basic: parseFloat(document.getElementById('fit_prev_basic').value) || 0,
+      prev_da: parseFloat(document.getElementById('fit_prev_da').value) || 0,
+      prev_hra: parseFloat(document.getElementById('fit_prev_hra').value) || 0,
+      new_basic: parseFloat(document.getElementById('fit_new_basic').value) || 0,
+      new_da: parseFloat(document.getElementById('fit_new_da').value) || 0,
+      new_hra: parseFloat(document.getElementById('fit_new_hra').value) || 0,
+    };
+  }
+
+  function calcFitmentSideJS(basic, da, hra, location, warehouse) {
+    const b = Number(basic) || 0;
+    const d = Number(da) || 0;
+    const h = Number(hra) || 0;
+    const bonus = Math.round((b + d) * 0.0833 * 100) / 100;
+    const gross = Math.round((b + d + h + bonus) * 100) / 100;
+
+    const isAbb = warehouse && warehouse.toLowerCase().includes('abb');
+    const pfBase = isAbb ? Math.min(b + d, 15000) : (b + d);
+    const pfEmp = Math.round(pfBase * 0.12 * 100) / 100;
+    const pfEr = Math.round(pfBase * 0.13 * 100) / 100;
+
+    const esicEmp = gross < 21000 ? Math.round(gross * 0.0075 * 100) / 100 : 0;
+    const esicEr = gross < 21000 ? Math.round(gross * 0.0325 * 100) / 100 : 0;
+
+    let pt = 0;
+    const locLower = (location || '').toLowerCase();
+    if (locLower.includes('hyderabad')) {
+      if (gross >= 20000) pt = 200;
+      else if (gross >= 15000) pt = 150;
+      else pt = 0;
+    } else {
+      pt = gross >= 25000 ? 200 : 0;
+    }
+
+    const totalDed = Math.round((pfEmp + esicEmp + pt) * 100) / 100;
+    const net = Math.round((gross - totalDed) * 100) / 100;
+    const ctc = Math.round((gross + pfEr + esicEr) * 100) / 100;
+
+    return { basic: b, da: d, hra: h, bonus, gross, pfEmp, esicEmp, pt, totalDed, net, ctc, pfEr, esicEr };
+  }
+
+  function recalcFitmentLive() {
+    const payload = getFitmentPayload();
+    const prev = calcFitmentSideJS(payload.prev_basic, payload.prev_da, payload.prev_hra, payload.location, payload.department);
+    const curr = calcFitmentSideJS(payload.new_basic, payload.new_da, payload.new_hra, payload.location, payload.department);
+
+    const fmt = n => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmt0 = n => Math.round(n).toLocaleString('en-IN');
+
+    // Update table headers
+    document.getElementById('fit_th_prev').textContent = payload.prev_year_label;
+    document.getElementById('fit_th_new').textContent = payload.new_year_label;
+
+    // Update cells
+    document.getElementById('pv_basic').textContent = fmt0(prev.basic);
+    document.getElementById('nw_basic').textContent = fmt0(curr.basic);
+
+    document.getElementById('pv_da').textContent = fmt0(prev.da);
+    document.getElementById('nw_da').textContent = fmt0(curr.da);
+
+    document.getElementById('pv_hra').textContent = fmt0(prev.hra);
+    document.getElementById('nw_hra').textContent = fmt0(curr.hra);
+
+    document.getElementById('pv_bonus').textContent = fmt(prev.bonus);
+    document.getElementById('nw_bonus').textContent = fmt(curr.bonus);
+
+    document.getElementById('pv_gross').textContent = fmt(prev.gross);
+    document.getElementById('nw_gross').textContent = fmt(curr.gross);
+
+    document.getElementById('pv_pf_emp').textContent = fmt(prev.pfEmp);
+    document.getElementById('nw_pf_emp').textContent = fmt(curr.pfEmp);
+
+    document.getElementById('pv_esic_emp').textContent = fmt(prev.esicEmp);
+    document.getElementById('nw_esic_emp').textContent = fmt(curr.esicEmp);
+
+    document.getElementById('pv_pt').textContent = fmt0(prev.pt);
+    document.getElementById('nw_pt').textContent = fmt0(curr.pt);
+
+    document.getElementById('pv_net').textContent = fmt(prev.net);
+    document.getElementById('nw_net').textContent = fmt(curr.net);
+
+    document.getElementById('pv_monthly').textContent = fmt(prev.net);
+    document.getElementById('nw_monthly').textContent = fmt(curr.net);
+
+    document.getElementById('pv_pf_er').textContent = fmt(prev.pfEr);
+    document.getElementById('nw_pf_er').textContent = fmt(curr.pfEr);
+
+    document.getElementById('pv_esic_er').textContent = fmt(prev.esicEr);
+    document.getElementById('nw_esic_er').textContent = fmt(curr.esicEr);
+
+    document.getElementById('pv_ctc').textContent = fmt(prev.ctc);
+    document.getElementById('nw_ctc').textContent = fmt(curr.ctc);
+
+    // Difference badges
+    const netDiff = curr.net - prev.net;
+    const ctcDiff = curr.ctc - prev.ctc;
+    const sign = netDiff >= 0 ? '+' : '';
+    document.getElementById('fit_diff_badge').textContent = `Net Hike: ${sign}₹${Math.round(netDiff).toLocaleString('en-IN')} / mo (CTC: ${sign}₹${Math.round(ctcDiff).toLocaleString('en-IN')})`;
+  }
+
+  async function downloadFitmentExcel() {
+    showLoader('Generating Fitment Letter Excel...');
+    try {
+      const payload = getFitmentPayload();
+      const res = await fetch('/fitment_letter/download_excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Fitment_Letter_${(payload.emp_name || 'Employee').replace(/\s+/g, '_')}_${payload.new_year_label}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      hideLoader();
+      showToast('Fitment Letter Excel downloaded successfully!');
+    } catch (e) {
+      hideLoader();
+      showToast('Excel download failed: ' + e.message, 'error');
+    }
+  }
+
+  async function downloadFitmentPdf() {
+    showLoader('Generating Fitment Letter PDF...');
+    try {
+      const payload = getFitmentPayload();
+      const res = await fetch('/fitment_letter/download_pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Fitment_Letter_${(payload.emp_name || 'Employee').replace(/\s+/g, '_')}_${payload.new_year_label}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      hideLoader();
+      showToast('Fitment Letter PDF downloaded successfully!');
+    } catch (e) {
+      hideLoader();
+      showToast('PDF download failed: ' + e.message, 'error');
+    }
+  }
+
+  async function sendFitmentWhatsApp() {
+    const payload = getFitmentPayload();
+    if (!payload.mobile_number) {
+      showToast('Please enter employee WhatsApp mobile number.', 'warning');
+      return;
+    }
+    showLoader(`Sending Fitment Letter to ${payload.mobile_number} on WhatsApp...`);
+    try {
+      const res = await fetch('/fitment_letter/send_whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      hideLoader();
+      if (res.ok && data.success) {
+        showToast(data.message || 'Fitment letter sent via WhatsApp!');
+      } else {
+        throw new Error(data.detail || data.message || 'Delivery failed');
+      }
+    } catch (e) {
+      hideLoader();
+      showToast('WhatsApp dispatch failed: ' + e.message, 'error');
+    }
+  }
 </script>
+
+<!-- Fitment Letter Modal -->
+<div id="fitmentModal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div>
+        <h3>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><polyline points="16 13 12 9 8 13"></polyline><line x1="12" y1="9" x2="12" y2="17"></line></svg>
+          Salary Fitment / Increment Letter
+        </h3>
+        <div id="fit_modal_subtitle" style="font-size: 12px; color: var(--text-muted); margin-top: 3px;"></div>
+      </div>
+      <button class="modal-close-btn" onclick="closeFitmentModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Employee Info -->
+      <div class="fitment-box">
+        <div class="fitment-box-title">
+          <span>Employee & Company Details</span>
+          <span class="badge-purple">Editable</span>
+        </div>
+        <div class="fitment-grid-3">
+          <div>
+            <label>Employee Name</label>
+            <input type="text" id="fit_emp_name" oninput="recalcFitmentLive()">
+          </div>
+          <div>
+            <label>Emp Code No</label>
+            <input type="text" id="fit_emp_id">
+          </div>
+          <div>
+            <label>Designation</label>
+            <input type="text" id="fit_designation">
+          </div>
+          <div>
+            <label>Department / Company</label>
+            <input type="text" id="fit_department" oninput="recalcFitmentLive()">
+          </div>
+          <div>
+            <label>Location / Place</label>
+            <input type="text" id="fit_location" oninput="recalcFitmentLive()">
+          </div>
+          <div>
+            <label>Date of Joining</label>
+            <input type="text" id="fit_doj">
+          </div>
+          <div>
+            <label>Company Header</label>
+            <input type="text" id="fit_company_name" value="RS MAN- TECH">
+          </div>
+          <div>
+            <label>Letter Date</label>
+            <input type="text" id="fit_date">
+          </div>
+          <div>
+            <label>WhatsApp Number</label>
+            <input type="text" id="fit_mobile" placeholder="919876543210">
+          </div>
+        </div>
+      </div>
+
+      <!-- Salary Comparison Inputs -->
+      <div class="fitment-grid-2">
+        <div class="fitment-box">
+          <div class="fitment-box-title">
+            <span>Before Salary</span>
+            <input type="text" id="fit_prev_label" value="25-26" style="width: 70px; padding: 2px 6px; font-size: 12px; text-align: center;" oninput="recalcFitmentLive()">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div>
+              <label>Basic (₹)</label>
+              <input type="number" id="fit_prev_basic" step="any" oninput="recalcFitmentLive()">
+            </div>
+            <div>
+              <label>DA (₹)</label>
+              <input type="number" id="fit_prev_da" step="any" oninput="recalcFitmentLive()">
+            </div>
+            <div>
+              <label>HRA (₹)</label>
+              <input type="number" id="fit_prev_hra" step="any" oninput="recalcFitmentLive()">
+            </div>
+          </div>
+        </div>
+
+        <div class="fitment-box" style="border-color: #c4b5fd; background: #faf5ff;">
+          <div class="fitment-box-title">
+            <span style="color: #6d28d9;">New / Incremented Salary</span>
+            <input type="text" id="fit_new_label" value="26-27" style="width: 70px; padding: 2px 6px; font-size: 12px; text-align: center; border-color: #8b5cf6;" oninput="recalcFitmentLive()">
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div>
+              <label>Basic (₹)</label>
+              <input type="number" id="fit_new_basic" step="any" oninput="recalcFitmentLive()">
+            </div>
+            <div>
+              <label>DA (₹)</label>
+              <input type="number" id="fit_new_da" step="any" oninput="recalcFitmentLive()">
+            </div>
+            <div>
+              <label>HRA (₹)</label>
+              <input type="number" id="fit_new_hra" step="any" oninput="recalcFitmentLive()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Comparison Breakdown Table -->
+      <div class="fitment-box">
+        <div class="fitment-box-title">
+          <span>Live Breakdown Preview (Auto-calculated)</span>
+          <span id="fit_diff_badge" class="badge-green">+ ₹0 / mo</span>
+        </div>
+        <table class="fitment-preview-table">
+          <thead>
+            <tr>
+              <th style="text-align: left;">Particulars</th>
+              <th id="fit_th_prev" style="width: 25%;">25-26</th>
+              <th id="fit_th_new" style="width: 25%; color: #6d28d9;">26-27</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Basic</td><td id="pv_basic" class="num">0</td><td id="nw_basic" class="num">0</td></tr>
+            <tr><td>Da</td><td id="pv_da" class="num">0</td><td id="nw_da" class="num">0</td></tr>
+            <tr><td>HRA</td><td id="pv_hra" class="num">0</td><td id="nw_hra" class="num">0</td></tr>
+            <tr><td>Status Bonus (8.33%)</td><td id="pv_bonus" class="num">0.00</td><td id="nw_bonus" class="num">0.00</td></tr>
+            <tr class="total-row"><td>Gross Take Home</td><td id="pv_gross" class="num">0.00</td><td id="nw_gross" class="num">0.00</td></tr>
+            <tr><td>PF deduction 12%</td><td id="pv_pf_emp" class="num">0.00</td><td id="nw_pf_emp" class="num">0.00</td></tr>
+            <tr><td>ESIC 0.75%</td><td id="pv_esic_emp" class="num">0.00</td><td id="nw_esic_emp" class="num">0.00</td></tr>
+            <tr><td>PT</td><td id="pv_pt" class="num">0</td><td id="nw_pt" class="num">0</td></tr>
+            <tr class="total-row" style="background: #f0fdf4; color: #166534;"><td>Net Take Home</td><td id="pv_net" class="num">0.00</td><td id="nw_net" class="num">0.00</td></tr>
+            <tr class="total-row"><td>Total Monthly Take Home</td><td id="pv_monthly" class="num">0.00</td><td id="nw_monthly" class="num">0.00</td></tr>
+            <tr><td>PF 13%</td><td id="pv_pf_er" class="num">0.00</td><td id="nw_pf_er" class="num">0.00</td></tr>
+            <tr><td>ESIC 3.25%</td><td id="pv_esic_er" class="num">0.00</td><td id="nw_esic_er" class="num">0.00</td></tr>
+            <tr class="total-row" style="background: #ede9fe; color: #5b21b6;"><td>Final CTC</td><td id="pv_ctc" class="num">0.00</td><td id="nw_ctc" class="num">0.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeFitmentModal()">Close</button>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="btn-outline" style="color: #059669; border-color: #a7f3d0;" onclick="downloadFitmentExcel()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download Excel (.xlsx)
+        </button>
+        <button class="btn-outline" style="color: var(--primary); border-color: #bfdbfe;" onclick="downloadFitmentPdf()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+          Download PDF (.pdf)
+        </button>
+        <button class="btn-success" style="background: #10b981;" onclick="sendFitmentWhatsApp()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          Send to WhatsApp
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 
