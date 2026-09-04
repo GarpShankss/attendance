@@ -60,8 +60,16 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
         db=db,
     )
 
+    norm_columns = []
+    seen_cols = set()
+    for doc in docs:
+        for k in doc.keys():
+            if not k.startswith("_") and k not in seen_cols:
+                seen_cols.add(k)
+                norm_columns.append(k)
+
     return {"collection": coll_name, "sheet": sheet_name, "rows": len(docs),
-            "columns": columns, "location": location, "warehouse": warehouse}
+            "columns": norm_columns or columns, "location": location, "warehouse": warehouse}
 
 
 def load_workbook_to_mongo(path, db, source_file=None):

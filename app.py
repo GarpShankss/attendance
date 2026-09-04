@@ -521,12 +521,35 @@ def get_filtered_data(location: str = None, warehouse: str = None,
     columns, seen = [], set()
     rows = []
 
-    if month and year:
-        matching = ["payroll_records"]
+    names = [n for n in db.list_collection_names() if not n.startswith("system.")]
+    matching = []
+
+    # Check for uploaded sheet collections matching location/warehouse (and month/year if specified)
+    sheet_matching = []
+    for name in names:
+        if name in ("payroll_records", "employee_master") or name.startswith("_"):
+            continue
+        sample = db[name].find_one()
+        if not sample:
+            continue
+        if location and sample.get("_location") != location:
+            continue
+        if warehouse and sample.get("_warehouse") != warehouse:
+            continue
+        if month and sample.get("_upload_month") and sample.get("_upload_month") != month:
+            continue
+        if year and sample.get("_upload_year") and sample.get("_upload_year") != year:
+            continue
+        sheet_matching.append(name)
+
+    if sheet_matching:
+        matching = sheet_matching
+    elif month and year:
+        matching = ["payroll_records"] if "payroll_records" in names else []
     else:
-        matching = []
-        names = [n for n in db.list_collection_names() if not n.startswith("system.")]
         for name in names:
+            if name == "employee_master" or name.startswith("_"):
+                continue
             sample = db[name].find_one()
             if not sample:
                 continue

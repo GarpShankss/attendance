@@ -40,8 +40,8 @@ from datetime import datetime
 SALARY_PREFIX = ("FIXED -", "CONTRIBUTION -", "Deductions -")
 
 # Columns used to identify an employee (checked in order, first match wins)
-EMP_ID_CANDIDATES  = ["ID Number", "Employee ID", "Emp ID", "EmpID", "Sl No", "S.No"]
-EMP_NAME_CANDIDATES = ["Employee Name", "Name", "Emp Name", "EMP NAME"]
+EMP_ID_CANDIDATES  = ["emp_id", "ID Number", "Employee ID", "Emp ID", "EmpID", "Sl No", "Sl.No", "Sl. No", "S.No", "S. No", "SL.NO", "SL NO", "Sl.no"]
+EMP_NAME_CANDIDATES = ["Employee Name", "emp_name", "NAME", "Name", "Emp Name", "EMP NAME"]
 
 MASTER_COLLECTION = "employee_master"
 

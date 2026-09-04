@@ -47,6 +47,8 @@ COLUMN_MAP = {
     # Employer / Contribution (calculated, written back)
     "emp_esi":                "CONTRIBUTION - ESIC @ 3.25%",
     "emp_pf":                 "CONTRIBUTION - EPF @ 13%",
+    "emp_leave":              "CONTRIBUTION - LWW",
+    "emp_bonus":              "CONTRIBUTION - STATUTORY BONUS",
     "uniform":                "CONTRIBUTION - Uniform Charges",
     "fixed_service_charge":   "CONTRIBUTION - Service Charge",
     "fixed_tshirt":           "CONTRIBUTION - T Shirt",
@@ -66,6 +68,15 @@ COLUMN_MAP = {
 
     # Net pay (calculated, written back)
     "net_pay":                "Net Pay",
+
+    # Employee Details
+    "emp_id":                 "emp_id",
+    "emp_name":               "Employee Name",
+    "mobile_number":          "Mobile Number",
+    "uan":                    "UAN",
+    "ifsc":                   "IFSC",
+    "account":                "ACCOUNT",
+    "designation":            "Designation",
 }
 
 # Fields that must never be overwritten (inputs, not outputs)
@@ -79,25 +90,48 @@ READONLY_FIELDS = {
 
 # Aliases for common variations in uploaded sheets
 ALIASES = {
-    "working_days": ["Basic Days", "Working Days", "FIXED - Working Days"],
-    "present_days": ["Actual Days", "Present Days"],
-    "pay_days":     ["Actual Days", "Pay Days"],
-    "fixed_basic":  ["BASIC", "Basic", "Fixed Basic", "FIXED - Basic"],
+    "working_days": ["Basic Days", "Working Days", "FIXED - Working Days", "Work Days", "Fixed Days"],
+    "present_days": ["Actual Days", "Present Days", "ATTENDANCE - Present Days"],
+    "pay_days":     ["Actual Days", "Pay Days", "ATTENDANCE - Pay Days", "Paid Days"],
+    "fixed_basic":  ["BASIC", "Basic", "Fixed Basic", "FIXED - Basic", "BASIC & DA", "Basic & DA", "FIXED - BASIC & DA", "FIXED - Basic & DA"],
     "fixed_da":     ["DA", "D.A", "Fixed DA", "FIXED - DA", "D.A."],
     "fixed_hra":    ["HRA", "H.R.A", "Fixed HRA", "FIXED - HRA", "H.R.A."],
     "fixed_bonus":  ["STATUORY BONUS", "STATUTORY BONUS", "Bonus", "Bonus @8.33%", "FIXED - STATUORY BONUS", "FIXED - STATUTORY BONUS", "FIXED - Bonus", "FIXED - Bonus @8.33%"],
-    "fixed_leave":  ["Leave With wages", "Leave wages", "Leave", "FIXED - Leave With wages", "LWW", "L.W.W", "L.W.W.", "LWW Charges", "Leave With Wages"],
-    "fixed_other":  ["Other Allows", "Other Allowance", "Others", "FIXED - Other Allows", "Other", "Other Allows."],
-    "fixed_spl":    ["Special Allowance", "Special Allows", "Spl Allowance", "SPL ALLOWANCE", "Special Allowances", "FIXED - Spl Allows", "FIXED - Special Allowance", "Spl Allows"],
-    "earned_other": ["EARNING - Other Allows", "Earned Other", "Earned Other Allows"],
-    "earned_spl":   ["EARNING - Spl Allows", "Earned Special Allowance", "EARNING - Special Allowance", "Earned Spl Allows"],
-    "fixed_total":  ["Total", "Gross", "Total Fixed", "FIXED - Total"],
-    "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes"],
+    "fixed_leave":  ["Leave With wages", "Leave wages", "Leave", "FIXED - Leave With wages", "LWW", "L.W.W", "L.W.W.", "LWW Charges", "Leave With Wages", "FIXED - LWW"],
+    "fixed_other":  ["Other Allows", "Other Allowance", "Others", "FIXED - Other Allows", "Other", "Other Allows.", "FIXED - OTHER ALLOWANCE", "FIXED - Other Allowance", "OTHER ALLOWANCE", "Other Allowance"],
+    "fixed_spl":    ["Special Allowance", "Special Allows", "Spl Allowance", "SPL ALLOWANCE", "Special Allowances", "FIXED - Spl Allows", "FIXED - Special Allowance", "Spl Allows", "FIXED - SPECIAL ALLOW", "FIXED - Special Allow", "SPECIAL ALLOW", "Special Allow"],
+    "earned_basic": ["EARNING - Basic", "EARNING - BASIC", "EARNED - Basic", "EARNED - BASIC", "EARNED - BASIC & DA", "EARNING - BASIC & DA", "Earned Basic", "EARNED - Basic & DA"],
+    "earned_da":    ["EARNING - DA", "EARNED - DA", "Earned DA", "EARNING - D.A", "EARNED - D.A"],
+    "earned_hra":   ["EARNING - HRA", "EARNED - HRA", "Earned HRA"],
+    "earned_other": ["EARNING - Other Allows", "EARNED - Other Allows", "Earned Other", "Earned Other Allows", "EARNING - OTHER ALLOWANCE", "EARNED - OTHER ALLOWANCE", "EARNING - Other Allowance", "EARNED - Other Allowance", "Earned Other Allowance", "EARNING - Other", "EARNED - Other"],
+    "earned_spl":   ["EARNING - Spl Allows", "EARNED - Spl Allows", "Earned Special Allowance", "EARNING - Special Allowance", "EARNED - Special Allowance", "Earned Spl Allows", "EARNING - SPECIAL ALLOW", "EARNED - SPECIAL ALLOW", "EARNING - Special Allow", "EARNED - Special Allow", "Earned Special Allow"],
+    "earned_leave": ["EARNING - Leave With wages", "EARNED - Leave With wages", "Earned Leave With Wages", "EARNING - LWW", "EARNED - LWW", "Earned LWW"],
+    "earned_bonus": ["EARNING - Bonus @8.33%", "EARNED - Bonus @8.33%", "EARNING - STATU BONUS", "EARNED - STATU BONUS", "EARNING - STATUTORY BONUS", "EARNED - STATUTORY BONUS", "Earned Bonus"],
+    "earned_ot":    ["OT", "O.T", "O.T.", "OT Amount", "OT AMOUNT", "Earned OT", "EARNING - OT", "EARNING - OT Amount", "EARNING - OT AMOUNT", "EARNED - OT", "EARNED - OT Amount", "EARNED - OT AMOUNT", "Overtime", "Over Time", "Overtime Amount", "OT Pay", "EARNING - Overtime", "ot"],
+    "earned_total": ["EARNING - Total", "EARNED - Total", "EARNING - TOTAL", "EARNED - TOTAL", "Earned Total", "EARNING - Gross", "EARNED - Gross"],
+    "fixed_total":  ["Total", "Gross", "Total Fixed", "FIXED - Total", "FIXED - TOTAL", "Fixed Total"],
+    "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes", "SHOE CHARGES", "Shoe Charges"],
     "fixed_tshirt": ["T SHIRT", "T-Shirt", "CONTRIBUTION - T Shirt"],
-    "fixed_service_charge": ["SERVICE CHARGES", "Service Charge", "CONTRIBUTION - Service Charge"],
-    "earned_ot":    ["OT", "O.T", "O.T.", "OT Amount", "OT AMOUNT", "Earned OT", "EARNING - OT", "EARNING - OT Amount", "EARNING - OT AMOUNT", "Overtime", "Over Time", "Overtime Amount", "OT Pay", "EARNING - Overtime", "ot"],
-    "ACCOUNT":      ["Account No", "A/C No", "Bank Account", "Account Number", "A/c Number", "A/C", "Bank A/c", "ACCOUNT"],
-    "IFSC":         ["IFSC Code", "IFSC", "IFSC CODE", "NEFT IFSC Code"],
+    "fixed_service_charge": ["SERVICE CHARGES", "SERVICE CHARGE", "Service Charge", "CONTRIBUTION - Service Charge", "Service Charges"],
+    "pf":           ["DEDUCTION - PF 12%", "Deductions - PF 12%", "PF 12%", "PF", "Deductions - PF", "DEDUCTION - PF"],
+    "esi":          ["DEDUCTION - ESI 0.75%", "Deductions - ESIC 0.75%", "Deductions - ESI 0.75%", "ESI 0.75%", "ESIC 0.75%", "DEDUCTION - ESIC 0.75%"],
+    "pt":           ["DEDUCTION - PT", "Deductions - PT", "PT", "P.T", "P.T."],
+    "advance":      ["DEDUCTION - ADV", "Deductions - Adv", "ADV", "Adv", "Advance", "DEDUCTION - Advance"],
+    "total_deduction": ["DEDUCTION - TOTAL", "Deductions - Total Deduction", "Deductions - Total", "Total Deduction", "TOTAL DEDUCTION"],
+    "emp_pf":       ["EMPLOYER CONTRIBUTION - PF 13%", "EMPLOYER CONTRIBUTION - PF  13%", "CONTRIBUTION - EPF @ 13%", "EMPLOYER CONTRIBUTION - EPF @ 13%", "EPF @ 13%"],
+    "emp_esi":      ["EMPLOYER CONTRIBUTION - ESI 3.25%", "EMPLOYER CONTRIBUTION - ESI  3.25%", "CONTRIBUTION - ESIC @ 3.25%", "EMPLOYER CONTRIBUTION - ESIC @ 3.25%", "ESIC @ 3.25%"],
+    "emp_leave":    ["EMPLOYER CONTRIBUTION - LWW", "CONTRIBUTION - LWW", "CONTRIBUTION - Leave With wages", "EMPLOYER CONTRIBUTION - Leave With wages", "LWW", "LWW Charges"],
+    "emp_bonus":    ["EMPLOYER CONTRIBUTION - STATU BONUS", "EMPLOYER CONTRIBUTION - STATUTORY BONUS", "CONTRIBUTION - STATUTORY BONUS", "CONTRIBUTION - Bonus @8.33%"],
+    "emp_contribution": ["EMPLOYER CONTRIBUTION - TOTAL", "CONTRIBUTION - Total Employer Contribution", "Total Employer Contribution"],
+    "ctc":          ["CTC", "CONTRIBUTION - CTC"],
+    "total_ctc":    ["TOTAL CTC", "CONTRIBUTION - Total CTC", "Total CTC"],
+    "emp_id":       ["Sl.No", "Sl No", "Sl. No", "S.No", "S. No", "ID Number", "Employee ID", "Emp ID", "EmpID", "SL.NO", "SL NO", "emp_id"],
+    "emp_name":     ["NAME", "Name", "Employee Name", "Emp Name", "EMP NAME", "emp_name"],
+    "mobile_number":["NAME - CONTACT", "CONTACT", "Contact", "Contact No", "Mobile", "Mobile Number", "Phone Number", "Phone", "mobile_number"],
+    "uan":          ["NAME - UAN", "UAN", "UAN NO", "UAN No.", "UAN Number", "uan"],
+    "ifsc":         ["IFSC CODE", "IFSC Code", "IFSC", "NEFT IFSC Code", "ifsc"],
+    "account":      ["ACCOUNT", "Account No", "A/C No", "Bank Account", "Account Number", "A/c Number", "A/C", "Bank A/c", "account"],
+    "designation":  ["Designation", "DESIGNATION", "designation"],
 }
 
 def R(v):
