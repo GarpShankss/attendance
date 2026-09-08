@@ -15,7 +15,7 @@ Then open http://localhost:8000
 """
 import os, shutil, tempfile, uuid
 from datetime import datetime
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pymongo import MongoClient
 import calendar
@@ -26,16 +26,86 @@ from datetime import timedelta
 
 class EventBroadcaster:
     def __init__(self):
-        self.queues = []
-    async def listen(self):
-        q = asyncio.Queue()
-        self.queues.append(q)
+        self.queues = set()
+        self.ws_clients = set()
+        self.loop = None
+
+    def set_loop(self, loop=None):
         try:
+            self.loop = loop or asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+
+    def broadcast(self, message: str = "update"):
+        if isinstance(message, (dict, list)):
+            msg_str = json.dumps(message)
+        else:
+            msg_str = str(message)
+        print(f"[BROADCASTER] Firing event for {msg_str} (SSE: {len(self.queues)}, WS: {len(self.ws_clients)})")
+        
+        # 1. Deliver to SSE queues
+        dead_queues = set()
+        for q in list(self.queues):
+            try:
+                if self.loop and self.loop.is_running():
+                    self.loop.call_soon_threadsafe(q.put_nowait, msg_str)
+                else:
+                    q.put_nowait(msg_str)
+            except Exception as e:
+                print(f"[BROADCASTER] SSE error: {e}")
+                dead_queues.add(q)
+        for q in dead_queues:
+            self.queues.discard(q)
+
+        # 2. Deliver to WebSockets
+        dead_ws = set()
+        for ws in list(self.ws_clients):
+            try:
+                if self.loop and self.loop.is_running():
+                    asyncio.run_coroutine_threadsafe(ws.send_text(msg_str), self.loop)
+                else:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            asyncio.create_task(ws.send_text(msg_str))
+                    except Exception as e:
+                        print(f"[BROADCASTER] WS loop error: {e}")
+            except Exception as e:
+                print(f"[BROADCASTER] WS send error: {e}")
+                dead_ws.add(ws)
+        for ws in dead_ws:
+            self.ws_clients.discard(ws)
+
+    async def listen(self):
+        self.set_loop(asyncio.get_running_loop())
+        q = asyncio.Queue()
+        self.queues.add(q)
+        try:
+            yield "data: connected\n\n"
             while True:
                 msg = await q.get()
                 yield f"data: {msg}\n\n"
-        except asyncio.CancelledError:
-            self.queues.remove(q)
+        except (asyncio.CancelledError, GeneratorExit):
+            pass
+        finally:
+            self.queues.discard(q)
+
+    async def connect_ws(self, websocket: WebSocket):
+        self.set_loop(asyncio.get_running_loop())
+        await websocket.accept()
+        self.ws_clients.add(websocket)
+        try:
+            await websocket.send_text(json.dumps({"type": "connected", "message": "connected"}))
+            while True:
+                data = await websocket.receive_text()
+                if data == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+        except (WebSocketDisconnect, asyncio.CancelledError):
+            pass
+        except Exception as e:
+            print(f"[BROADCASTER] WS client error: {e}")
+        finally:
+            self.ws_clients.discard(websocket)
 
 broadcaster = EventBroadcaster()
 
@@ -60,6 +130,10 @@ else:
 db = client[DB_NAME]
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    broadcaster.set_loop(asyncio.get_running_loop())
 
 # internal/meta fields - never shown as a data column, never editable
 HIDDEN_FIELDS = {"_id", "_row_id", "_source_file", "_sheet", "_location", "_warehouse",
@@ -497,17 +571,28 @@ async def sse_events():
         }
     )
 
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await broadcaster.connect_ws(websocket)
+
+
 @app.get("/payroll_record/{location}/{warehouse}/{month}/{year}/{emp_id}")
 def get_payroll_record_endpoint(location: str, warehouse: str, month: int, year: int, emp_id: str):
-    doc = db["payroll_records"].find_one({
-        "location": location,
-        "warehouse": warehouse,
-        "month": month,
-        "year": year,
-        "emp_id": emp_id
-    })
+    query = {
+        "month": int(month),
+        "year": int(year),
+        "emp_id": str(emp_id)
+    }
+    if location and location != "all":
+        query["location"] = location
+    if warehouse and warehouse != "all":
+        query["warehouse"] = warehouse
+
+    doc = db["payroll_records"].find_one(query)
     if not doc:
-        return {}
+        doc = db["payroll_records"].find_one({"month": int(month), "year": int(year), "emp_id": str(emp_id)})
+        if not doc:
+            return {}
     flat = _flatten_doc(doc)
     flat["_id"] = str(doc.get("_id"))
     flat["_collection"] = "payroll_records"
@@ -622,6 +707,7 @@ def add_row(name: str, payload: dict = Body(...)):
            "_source_file": "manual",
            "_upload_month": now.month, "_upload_year": now.year}
     db[name].insert_one(doc)
+    broadcaster.broadcast("reload")
     return {"ok": True, "_row_id": next_id}
 
 
@@ -696,6 +782,8 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
     updated = db[name].find_one(_row_filter(name, row_id))
     clean = _flatten_doc(updated)
     clean.pop("_id", None)
+    emp_id = updated.get("emp_id") or base.get("emp_id") or str(row_id)
+    broadcaster.broadcast(emp_id)
     return {"ok": True, "row": clean, "calc_log": calc_log}
 
 
@@ -726,6 +814,7 @@ def delete_employee(location: str, warehouse: str, emp_id: str):
         "warehouse": warehouse,
         "emp_id": emp_id,
     })
+    broadcaster.broadcast(emp_id)
     return {
         "ok": True,
         "attendance_deleted": att_res.deleted_count,
@@ -749,6 +838,7 @@ def delete_employee_month(location: str, warehouse: str, emp_id: str, month: int
         "month": month,
         "year": year
     })
+    broadcaster.broadcast(emp_id)
     return {
         "ok": True,
         "attendance_deleted": att_res.deleted_count,
@@ -766,7 +856,11 @@ def update_cell(name: str, row_id: str, payload: dict):
     result = db[name].update_one(_row_filter(name, row_id), {"$set": {column: value}})
     if result.matched_count == 0:
         raise HTTPException(404, "row not found")
+    stored = db[name].find_one(_row_filter(name, row_id))
+    emp_id = (stored.get("emp_id") if stored else None) or str(row_id)
+    broadcaster.broadcast(emp_id)
     return {"ok": True}
+
 
 
 # ---------------------------------------------------------------------------
@@ -936,6 +1030,7 @@ def generate_payroll(payload: dict = Body(...)):
         raise HTTPException(400, "month and year are required")
 
     result = generate_monthly_payroll(month, year, location, warehouse, db)
+    broadcaster.broadcast("reload")
     return result
 
 
@@ -1137,6 +1232,7 @@ def create_employee(payload: dict = Body(...)):
         db=db
     )
     
+    broadcaster.broadcast(emp_id)
     return {"ok": True, "emp_id": emp_id}
 
 
@@ -1282,10 +1378,8 @@ def save_attendance(location: str, warehouse: str, emp_id: str,
                     update_fields["Net Pay"] = v
         if update_fields:
             db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
-            print(f"[SSE BROADCAST] Firing attendance save event for emp_id: {emp_id}")
-            for q in broadcaster.queues:
-                q.put_nowait(emp_id)
 
+    broadcaster.broadcast(emp_id)
     return {"ok": True}
 
 
@@ -1312,6 +1406,7 @@ def delete_employee(location: str, warehouse: str, emp_id: str, scope: str = "al
             {"emp_id": emp_id, "location": location, "warehouse": warehouse},
             {"$unset": unset_dict}
         )
+    broadcaster.broadcast(emp_id)
     return {"ok": True, "deleted": emp_id, "scope": scope}
 
 
@@ -1489,8 +1584,7 @@ def update_employee_status(location: str, warehouse: str, emp_id: str, payload: 
         )
 
     # Broadcast event
-    for q in broadcaster.queues:
-        q.put_nowait(emp_id)
+    broadcaster.broadcast(emp_id)
 
     return {"ok": True, "emp_id": emp_id, "status": status, "leaving_date": leaving_date_str}
 
@@ -1563,10 +1657,10 @@ def update_employee_doj(location: str, warehouse: str, emp_id: str, payload: dic
                         update_fields["Net Pay"] = v
             db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
 
-    for q in broadcaster.queues:
-        q.put_nowait(emp_id)
+    broadcaster.broadcast(emp_id)
 
     return {"ok": True, "emp_id": emp_id, "doj": doj_str}
+
 
 
 
@@ -1794,6 +1888,7 @@ def generate_all_payslips(payload: dict = Body(...)):
         except Exception as e:
             print(f"Error generating for {record.get('emp_id')}: {e}")
             
+    broadcaster.broadcast("reload")
     return {"status": "success", "generated": generated}
 
 @app.get("/payroll/download_all")

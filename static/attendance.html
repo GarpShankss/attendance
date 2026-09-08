@@ -910,6 +910,55 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
   localStorage.removeItem('rs_auth');
   window.location.href = '/login.html';
 });
+
+// ── Live Realtime Sync (WebSocket with SSE Fallback) ─────────────────────────
+let attWsClient = null;
+let attWsPingTimer = null;
+let attWsReconnectTimer = null;
+
+function setupAttendanceRealtime() {
+  if (attWsClient) {
+    try { attWsClient.close(); } catch(e) {}
+    attWsClient = null;
+  }
+  clearInterval(attWsPingTimer);
+  clearTimeout(attWsReconnectTimer);
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+  try {
+    attWsClient = new WebSocket(wsUrl);
+
+    attWsClient.onopen = () => {
+      console.log("[WS Attendance] Connected to live updates");
+      attWsPingTimer = setInterval(() => {
+        if (attWsClient && attWsClient.readyState === WebSocket.OPEN) {
+          attWsClient.send("ping");
+        }
+      }, 20000);
+    };
+
+    attWsClient.onmessage = (e) => {
+      let dataStr = typeof e.data === 'string' ? e.data.trim() : '';
+      if (dataStr === 'connected' || dataStr === 'pong' || dataStr.includes('"pong"')) return;
+      console.log("[WS Attendance] Live update received:", dataStr);
+      // If currently active table is loaded, refresh attendance table quietly
+      if (currentLocation && currentWarehouse && currentMonth && currentYear) {
+        loadAttendance();
+      }
+    };
+
+    attWsClient.onclose = () => {
+      clearInterval(attWsPingTimer);
+      attWsReconnectTimer = setTimeout(setupAttendanceRealtime, 3000);
+    };
+  } catch(err) {
+    console.warn("[WS Attendance] Failed to connect:", err);
+  }
+}
+
+setupAttendanceRealtime();
 </script>
 
 <div id="leftModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:3000; align-items:center; justify-content:center;">

@@ -311,6 +311,14 @@
   .loader-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--text); font-weight: 600; }
   .spinner { width: 40px; height: 40px; border: 4px solid var(--border); border-left-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  @keyframes rowFlash {
+    0% { background-color: rgba(99, 102, 241, 0.28); }
+    100% { background-color: transparent; }
+  }
+  .row-updated td {
+    animation: rowFlash 2.5s ease-out;
+  }
 </style>
 </head>
 <body>
@@ -1331,45 +1339,195 @@ loadSettings();
       }
   }, { passive: false });
 
-  // ── Live Salary Updates (SSE) ──────────────────────────────────────────────
-  const evtSource = new EventSource('/events');
-  evtSource.onmessage = async (e) => {
-    const empId = e.data;
-    console.log("[SSE] Received broadcast for empId:", empId);
-    
-    // Only update if filters are set and we are actively viewing data
-    if (els.filterMonth.value && els.filterYear.value && els.filterLocation.value && els.filterWarehouse.value) {
-      const rowKey = `payroll_records__${empId}`;
-      const tr = document.querySelector(`tr[data-row-key="${rowKey}"]`);
-      
-      // If the row is visible and the user is NOT actively editing ANY row
-      if (tr && Object.keys(editingRows).length === 0) {
-        try {
-          const loc = encodeURIComponent(els.filterLocation.value);
-          const wh = encodeURIComponent(els.filterWarehouse.value);
-          const mo = els.filterMonth.value;
-          const yr = els.filterYear.value;
-          const emp = encodeURIComponent(empId);
-          
-          let res = await fetch(`/payroll_record/${loc}/${wh}/${mo}/${yr}/${emp}`);
-          if (res.ok) {
-            let rowData = await res.json();
-            if (rowData && rowData.emp_id) {
-               // Update global data array
-               const idx = currentData.findIndex(r => r.emp_id === empId && r._collection === 'payroll_records');
-               if (idx !== -1) {
-                  currentData[idx] = rowData;
-                  // Re-render the whole table quickly to update this row and all totals/footers
-                  renderDataTable(currentColumns, currentData);
-               }
-            }
-          }
-        } catch (err) {
-          console.error("SSE fetch failed", err);
+  // ── Live Salary Updates (WebSocket with SSE Fallback) ───────────────────────
+  let wsClient = null;
+  let wsPingTimer = null;
+  let wsReconnectTimer = null;
+  let sseClient = null;
+
+  async function handleRealtimeUpdate(rawData) {
+    if (!rawData) return;
+    let dataStr = typeof rawData === 'string' ? rawData.trim() : JSON.stringify(rawData);
+    console.log("[REALTIME] Event received:", dataStr);
+
+    let empId = null;
+    let isReload = false;
+
+    if (dataStr.startsWith('{') && dataStr.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(dataStr);
+        if (parsed.type === 'connected' || parsed.type === 'pong') return;
+        if (parsed.type === 'reload' || parsed.action === 'reload') {
+          isReload = true;
+        } else {
+          empId = parsed.emp_id || parsed.empId || parsed.id || parsed.message;
         }
+      } catch (e) {
+        empId = dataStr;
+      }
+    } else {
+      if (dataStr === 'connected' || dataStr === 'pong') return;
+      if (dataStr === 'reload' || dataStr === 'update') {
+        isReload = true;
+      } else {
+        empId = dataStr;
       }
     }
-  };
+
+    // If the user is currently actively editing rows with open inputs, do not disturb their inputs
+    if (Object.keys(editingRows).length > 0) {
+      console.log("[REALTIME] User is actively editing rows, skipping auto-render");
+      return;
+    }
+
+    const tableWrap = document.getElementById('tableWrap');
+    const scrollTop = tableWrap ? tableWrap.scrollTop : 0;
+    const scrollLeft = tableWrap ? tableWrap.scrollLeft : 0;
+
+    if (isReload) {
+      console.log("[REALTIME] Reloading salary sheet...");
+      await loadData();
+      if (tableWrap) {
+        tableWrap.scrollTop = scrollTop;
+        tableWrap.scrollLeft = scrollLeft;
+      }
+      return;
+    }
+
+    if (!empId) return;
+
+    // Check if we have active data loaded
+    if (currentData && currentData.length > 0) {
+      const empIndex = currentData.findIndex(r => 
+        (r.emp_id && String(r.emp_id).trim() === String(empId).trim()) ||
+        (r['Sl.No'] && String(r['Sl.No']).trim() === String(empId).trim()) ||
+        (r._row_id && String(r._row_id).trim() === String(empId).trim())
+      );
+
+      if (empIndex !== -1) {
+        const existingRow = currentData[empIndex];
+        const loc = (els.filterLocation && els.filterLocation.value) || existingRow.location || existingRow._location || 'all';
+        const wh = (els.filterWarehouse && els.filterWarehouse.value) || existingRow.warehouse || existingRow._warehouse || 'all';
+        const mo = (els.filterMonth && els.filterMonth.value) || existingRow.month || existingRow._upload_month;
+        const yr = (els.filterYear && els.filterYear.value) || existingRow.year || existingRow._upload_year;
+
+        if (mo && yr) {
+          try {
+            const res = await fetch(`/payroll_record/${encodeURIComponent(loc)}/${encodeURIComponent(wh)}/${mo}/${yr}/${encodeURIComponent(empId)}`);
+            if (res.ok) {
+              const rowData = await res.json();
+              if (rowData && (rowData.emp_id || rowData._row_id)) {
+                currentData[empIndex] = { ...currentData[empIndex], ...rowData };
+                renderDataTable(currentColumns, currentData);
+                if (tableWrap) {
+                  tableWrap.scrollTop = scrollTop;
+                  tableWrap.scrollLeft = scrollLeft;
+                }
+                const params = new URLSearchParams();
+                if (loc && loc !== 'all') params.set('location', loc);
+                if (wh && wh !== 'all') params.set('warehouse', wh);
+                updateDashboardStats(params, currentData);
+
+                // Highlight the updated row
+                const rowKey = `payroll_records__${empId}`;
+                const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`) ||
+                           els.dataTable.querySelector(`tr[data-row-id="${CSS.escape(empId)}"]`);
+                if (tr) {
+                  tr.classList.add('row-updated');
+                  setTimeout(() => tr.classList.remove('row-updated'), 2600);
+                }
+                return;
+              }
+            }
+          } catch(err) {
+            console.warn("[REALTIME] Single row fetch failed, fallback to loadData:", err);
+          }
+        }
+      }
+
+      // If single row update didn't apply or row was newly added/removed, reload data table
+      await loadData();
+      if (tableWrap) {
+        tableWrap.scrollTop = scrollTop;
+        tableWrap.scrollLeft = scrollLeft;
+      }
+      
+      // Highlight row if found after reload
+      const rowKey = `payroll_records__${empId}`;
+      const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`) ||
+                 els.dataTable.querySelector(`tr[data-row-id="${CSS.escape(empId)}"]`);
+      if (tr) {
+        tr.classList.add('row-updated');
+        setTimeout(() => tr.classList.remove('row-updated'), 2600);
+      }
+    }
+  }
+
+  function setupRealtimeConnection() {
+    if (wsClient) {
+      try { wsClient.close(); } catch(e) {}
+      wsClient = null;
+    }
+    clearInterval(wsPingTimer);
+    clearTimeout(wsReconnectTimer);
+
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+    try {
+      console.log("[WS] Connecting to", wsUrl);
+      wsClient = new WebSocket(wsUrl);
+
+      wsClient.onopen = () => {
+        console.log("[WS] Live WebSocket connected");
+        wsPingTimer = setInterval(() => {
+          if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+            wsClient.send("ping");
+          }
+        }, 20000);
+      };
+
+      wsClient.onmessage = (e) => {
+        handleRealtimeUpdate(e.data);
+      };
+
+      wsClient.onerror = (e) => {
+        console.warn("[WS] Socket error, ensuring SSE fallback:", e);
+        startSSEFallback();
+      };
+
+      wsClient.onclose = (e) => {
+        console.log("[WS] Socket closed, reconnecting in 3s...", e);
+        clearInterval(wsPingTimer);
+        wsReconnectTimer = setTimeout(setupRealtimeConnection, 3000);
+        startSSEFallback();
+      };
+    } catch(err) {
+      console.error("[WS] WebSocket initialization failed:", err);
+      startSSEFallback();
+    }
+  }
+
+  function startSSEFallback() {
+    if (sseClient) return;
+    try {
+      console.log("[SSE] Initializing fallback EventSource");
+      sseClient = new EventSource('/events');
+      sseClient.onmessage = (e) => {
+        if (wsClient && wsClient.readyState === WebSocket.OPEN) return;
+        handleRealtimeUpdate(e.data);
+      };
+      sseClient.onerror = () => {
+        console.warn("[SSE] EventSource error");
+      };
+    } catch(err) {
+      console.error("[SSE] Failed to setup SSE fallback:", err);
+    }
+  }
+
+  setupRealtimeConnection();
+  startSSEFallback();
+
 
   // ── Fitment Letter Modal & Handlers ─────────────────────────────────────────
   async function openFitmentModal(empId, rowKey) {
