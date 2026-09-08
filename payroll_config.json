@@ -15,6 +15,7 @@
     "SL": { "name": "Sick Leave",      "present": 1,   "paid": true,  "lop": 0 },
     "PL": { "name": "Paid Leave",      "present": 1,   "paid": true,  "lop": 0 },
     "HL": { "name": "Half Leave",      "present": 0.5, "paid": true,  "lop": 0.5 },
-    "A":  { "name": "Absent",          "present": 0,   "paid": false, "lop": 1 }
+    "A":  { "name": "Absent",          "present": 0,   "paid": false, "lop": 1 },
+    "L":  { "name": "Left",            "present": 0,   "paid": false, "lop": 0 }
   }
 }

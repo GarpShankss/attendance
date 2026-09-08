@@ -1110,12 +1110,14 @@ def create_employee(payload: dict = Body(...)):
         raise HTTPException(409, f"Employee {emp_id!r} already exists for "
                                  f"{location} / {warehouse}")
 
+    doj = str(payload.get("doj") or (payload.get("identity", {}).get("DOJ") if isinstance(payload.get("identity"), dict) else "") or "").strip()
     doc = {
         "emp_id":       emp_id,
         "emp_name":     str(payload["emp_name"]).strip(),
         "location":     location,
         "warehouse":    warehouse,
         "status":       "active",
+        "doj":          doj,
         "joined_month": int(payload["joined_month"]),
         "joined_year":  int(payload["joined_year"]),
         "salary":       payload.get("salary", {}),
@@ -1239,13 +1241,15 @@ def save_attendance(location: str, warehouse: str, emp_id: str,
     payroll_doc = _ensure_payroll_record(emp_id, location, warehouse, month, year)
     if payroll_doc:
         row = _flatten_salary_doc(payroll_doc)
-        fixed_wd = row.get("FIXED - Working Days") or row.get("identity", {}).get("FIXED - Working Days")
+        fixed_wd = row.get("FIXED - Working Days") or (row.get("identity", {}).get("FIXED - Working Days") if isinstance(row.get("identity"), dict) else None)
         try:
             fixed_wd = float(fixed_wd)
         except (ValueError, TypeError):
             fixed_wd = None
-        doj_str = row.get("DOJ") or row.get("identity", {}).get("DOJ")
-        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, doj_str=doj_str)
+        master_emp = db["employee_master"].find_one({"emp_id": emp_id, "location": location, "warehouse": warehouse}) or {}
+        doj_str = row.get("DOJ") or (row.get("identity", {}).get("DOJ") if isinstance(row.get("identity"), dict) else None) or master_emp.get("doj")
+        leaving_date_str = row.get("leaving_date") or master_emp.get("leaving_date") or (master_emp.get("identity", {}).get("DOL") if isinstance(master_emp.get("identity"), dict) else None)
+        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, doj_str=doj_str, leaving_date_str=leaving_date_str)
         
         row["ATTENDANCE - Present Days"] = present_days
         row["ATTENDANCE - Pay Days"] = pay_days
@@ -1313,8 +1317,10 @@ def delete_employee(location: str, warehouse: str, emp_id: str, scope: str = "al
 
 @app.get("/attendance/employees")
 def get_attendance_employees(location: str, warehouse: str, month: int, year: int):
-    query = {"status": "active", "location": location, "warehouse": warehouse}
-    masters = list(db["employee_master"].find(query, {"_id": 0}).sort("emp_id", 1))
+    from employee_master import is_employee_eligible_for_month
+    query = {"location": location, "warehouse": warehouse}
+    masters_raw = list(db["employee_master"].find(query, {"_id": 0}).sort("emp_id", 1))
+    masters = [emp for emp in masters_raw if is_employee_eligible_for_month(emp, month, year)]
 
     # Fetch all attendance records for this location/warehouse in a single query
     att_cursor = db[ATTENDANCE_COLL].find(
@@ -1334,15 +1340,21 @@ def get_attendance_employees(location: str, warehouse: str, month: int, year: in
         except (ValueError, TypeError):
             fixed_wd = None
             
-        doj_str = emp.get("DOJ")
-        present_days, absent_days, pay_days, lop, wd = _calc_attendance(emp_id, location, warehouse, month, year, full_days, fixed_wd, doj_str=doj_str)
+        doj_str = emp.get("doj") or emp.get("DOJ") or (emp.get("identity", {}).get("DOJ") if isinstance(emp.get("identity"), dict) else None)
+        leaving_date_str = emp.get("leaving_date") or (emp.get("identity", {}).get("DOL") or emp.get("identity", {}).get("leaving_date") if isinstance(emp.get("identity"), dict) else None)
+        present_days, absent_days, pay_days, lop, wd = _calc_attendance(
+            emp_id, location, warehouse, month, year, full_days, fixed_wd,
+            doj_str=doj_str, leaving_date_str=leaving_date_str
+        )
         
         employees.append({
             "emp_id":       emp_id,
             "emp_name":     emp.get("emp_name", ""),
-            "department":   emp.get("Department", ""),
-            "designation":  emp.get("Designation", ""),
-            "doj":          emp.get("DOJ", ""),
+            "department":   emp.get("Department", "") or (emp.get("identity", {}).get("Department", "") if isinstance(emp.get("identity"), dict) else ""),
+            "designation":  emp.get("Designation", "") or (emp.get("identity", {}).get("Designation", "") if isinstance(emp.get("identity"), dict) else ""),
+            "doj":          doj_str or "",
+            "status":       emp.get("status", "active"),
+            "leaving_date": leaving_date_str or "",
             "days":         full_days,
             "present_days": present_days,
             "absent_days":  absent_days,
@@ -1353,6 +1365,209 @@ def get_attendance_employees(location: str, warehouse: str, month: int, year: in
     cfg = get_config()
     policy = cfg.get("attendance_policy", {})
     return {"employees": employees, "policy": policy}
+
+
+@app.post("/employee/{location}/{warehouse}/{emp_id}/status")
+def update_employee_status(location: str, warehouse: str, emp_id: str, payload: dict = Body(...)):
+    status = str(payload.get("status", "")).strip().lower()
+    if status not in ("active", "left", "discontinued"):
+        raise HTTPException(400, "Invalid status. Must be 'active' or 'left' / 'discontinued'")
+
+    month = int(payload.get("month", 0))
+    year = int(payload.get("year", 0))
+    leaving_date_str = str(payload.get("leaving_date", "")).strip()
+
+    emp_filter = {"emp_id": emp_id, "location": location, "warehouse": warehouse}
+    master = db["employee_master"].find_one(emp_filter)
+    if not master:
+        raise HTTPException(404, "Employee not found in master")
+
+    now = datetime.utcnow()
+    if status in ("left", "discontinued"):
+        if not leaving_date_str:
+            leaving_date_str = now.strftime("%Y-%m-%d")
+
+        try:
+            leaving_dt = datetime.strptime(leaving_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(400, "Invalid leaving_date format, must be YYYY-MM-DD")
+
+        left_m = month or leaving_dt.month
+        left_y = year or leaving_dt.year
+
+        db["employee_master"].update_one(
+            emp_filter,
+            {"$set": {
+                "status": "left",
+                "leaving_date": leaving_date_str,
+                "left_month": left_m,
+                "left_year": left_y,
+                "identity.DOL": leaving_date_str,
+                "last_updated": now
+            }}
+        )
+
+        # Update attendance in this cycle: mark dates after leaving_date as "L"
+        period_dates = get_payroll_dates(left_m, left_y)
+        att_updates = {}
+        for d_str in period_dates:
+            try:
+                dt = datetime.strptime(d_str, "%Y-%m-%d").date()
+                if dt > leaving_dt:
+                    att_updates[f"days.{d_str}"] = "L"
+            except ValueError:
+                pass
+
+        if att_updates:
+            att_updates["updated_at"] = now
+            db[ATTENDANCE_COLL].update_one(emp_filter, {"$set": att_updates}, upsert=True)
+
+        # Recalculate attendance & payroll for this month
+        att_doc = db[ATTENDANCE_COLL].find_one(emp_filter)
+        full_days = att_doc.get("days", {}) if att_doc else {}
+        payroll_doc = _ensure_payroll_record(emp_id, location, warehouse, left_m, left_y)
+        if payroll_doc:
+            row = _flatten_salary_doc(payroll_doc)
+            fixed_wd = row.get("FIXED - Working Days") or (row.get("identity", {}).get("FIXED - Working Days") if isinstance(row.get("identity"), dict) else None)
+            try:
+                fixed_wd = float(fixed_wd)
+            except (ValueError, TypeError):
+                fixed_wd = None
+            doj_str = master.get("doj") or (master.get("identity", {}).get("DOJ") if isinstance(master.get("identity"), dict) else None)
+            present_days, absent_days, pay_days, lop, wd = _calc_attendance(
+                emp_id, location, warehouse, left_m, left_y, full_days, fixed_wd,
+                doj_str=doj_str, leaving_date_str=leaving_date_str
+            )
+            row["ATTENDANCE - Present Days"] = present_days
+            row["ATTENDANCE - Pay Days"] = pay_days
+            row["ATTENDANCE - LOP"] = lop
+            calculated = recalculate(row)
+            update_fields = {
+                "attendance.ATTENDANCE - Present Days": present_days,
+                "attendance.ATTENDANCE - Pay Days": pay_days,
+                "attendance.ATTENDANCE - LOP": lop,
+                "ATTENDANCE - Present Days": present_days,
+                "ATTENDANCE - Pay Days": pay_days,
+                "ATTENDANCE - LOP": lop,
+                "status": "left",
+                "leaving_date": leaving_date_str,
+                "updated_at": now
+            }
+            for k, v in calculated.items():
+                if k not in {"__calc_log__", "_id"} and not isinstance(v, dict):
+                    if k.startswith("EARNING -"):
+                        update_fields[f"earnings.{k}"] = v
+                        update_fields[k] = v
+                    elif k.startswith("Deductions -"):
+                        update_fields[f"deductions.{k}"] = v
+                        update_fields[k] = v
+                    elif k.startswith("CONTRIBUTION -"):
+                        update_fields[f"contributions.{k}"] = v
+                        update_fields[k] = v
+                    elif k == "Net Pay":
+                        update_fields["net_pay"] = v
+                        update_fields["Net Pay"] = v
+            db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
+
+        # Remove future month payroll records
+        db["payroll_records"].delete_many({
+            "emp_id": emp_id, "location": location, "warehouse": warehouse,
+            "$or": [
+                {"year": {"$gt": left_y}},
+                {"year": left_y, "month": {"$gt": left_m}}
+            ]
+        })
+
+    else:
+        # Reactivate
+        db["employee_master"].update_one(
+            emp_filter,
+            {
+                "$set": {"status": "active", "last_updated": now},
+                "$unset": {"leaving_date": "", "left_month": "", "left_year": "", "identity.DOL": ""}
+            }
+        )
+
+    # Broadcast event
+    for q in broadcaster.queues:
+        q.put_nowait(emp_id)
+
+    return {"ok": True, "emp_id": emp_id, "status": status, "leaving_date": leaving_date_str}
+
+
+@app.patch("/employee/{location}/{warehouse}/{emp_id}/doj")
+def update_employee_doj(location: str, warehouse: str, emp_id: str, payload: dict = Body(...)):
+    doj_str = str(payload.get("doj", "")).strip()
+    month = int(payload.get("month", 0))
+    year = int(payload.get("year", 0))
+
+    emp_filter = {"emp_id": emp_id, "location": location, "warehouse": warehouse}
+    master = db["employee_master"].find_one(emp_filter)
+    if not master:
+        raise HTTPException(404, "Employee not found in master")
+
+    now = datetime.utcnow()
+    db["employee_master"].update_one(
+        emp_filter,
+        {"$set": {
+            "doj": doj_str,
+            "identity.DOJ": doj_str,
+            "last_updated": now
+        }}
+    )
+
+    if month and year:
+        att_doc = db[ATTENDANCE_COLL].find_one(emp_filter)
+        full_days = att_doc.get("days", {}) if att_doc else {}
+        payroll_doc = _ensure_payroll_record(emp_id, location, warehouse, month, year)
+        if payroll_doc:
+            row = _flatten_salary_doc(payroll_doc)
+            fixed_wd = row.get("FIXED - Working Days") or (row.get("identity", {}).get("FIXED - Working Days") if isinstance(row.get("identity"), dict) else None)
+            try:
+                fixed_wd = float(fixed_wd)
+            except (ValueError, TypeError):
+                fixed_wd = None
+            leaving_date_str = master.get("leaving_date") or (master.get("identity", {}).get("DOL") if isinstance(master.get("identity"), dict) else None)
+            present_days, absent_days, pay_days, lop, wd = _calc_attendance(
+                emp_id, location, warehouse, month, year, full_days, fixed_wd,
+                doj_str=doj_str, leaving_date_str=leaving_date_str
+            )
+            row["ATTENDANCE - Present Days"] = present_days
+            row["ATTENDANCE - Pay Days"] = pay_days
+            row["ATTENDANCE - LOP"] = lop
+            calculated = recalculate(row)
+            update_fields = {
+                "attendance.ATTENDANCE - Present Days": present_days,
+                "attendance.ATTENDANCE - Pay Days": pay_days,
+                "attendance.ATTENDANCE - LOP": lop,
+                "ATTENDANCE - Present Days": present_days,
+                "ATTENDANCE - Pay Days": pay_days,
+                "ATTENDANCE - LOP": lop,
+                "DOJ": doj_str,
+                "identity.DOJ": doj_str,
+                "updated_at": now
+            }
+            for k, v in calculated.items():
+                if k not in {"__calc_log__", "_id"} and not isinstance(v, dict):
+                    if k.startswith("EARNING -"):
+                        update_fields[f"earnings.{k}"] = v
+                        update_fields[k] = v
+                    elif k.startswith("Deductions -"):
+                        update_fields[f"deductions.{k}"] = v
+                        update_fields[k] = v
+                    elif k.startswith("CONTRIBUTION -"):
+                        update_fields[f"contributions.{k}"] = v
+                        update_fields[k] = v
+                    elif k == "Net Pay":
+                        update_fields["net_pay"] = v
+                        update_fields["Net Pay"] = v
+            db["payroll_records"].update_one({"_id": payroll_doc["_id"]}, {"$set": update_fields})
+
+    for q in broadcaster.queues:
+        q.put_nowait(emp_id)
+
+    return {"ok": True, "emp_id": emp_id, "doj": doj_str}
+
 
 
 # ---------------------------------------------------------------------------
@@ -1425,7 +1640,7 @@ def download_attendance(month: int, year: int, location: str, warehouse: str):
         curr += timedelta(days=1)
         
     # Headers
-    headers = ["Emp ID", "Employee Name", "Department", "Designation"]
+    headers = ["Emp ID", "Employee Name", "Department", "Designation", "DOJ"]
     date_strs = [d.strftime("%Y-%m-%d") for d in dates]
     headers.extend([str(d.day) for d in dates])
     headers.extend(["Working Days", "Present Days", "Paid Days", "LOP", "Absent Days"])
@@ -1437,11 +1652,11 @@ def download_attendance(month: int, year: int, location: str, warehouse: str):
     for col_idx, col_name in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx)
         cell.font = header_font
-        if col_idx <= 4:
+        if col_idx <= 5:
             cell.fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
-        elif col_idx <= 4 + len(dates):
+        elif col_idx <= 5 + len(dates):
             # date columns
-            is_abm = dates[col_idx-5].month == d_start_month
+            is_abm = dates[col_idx-6].month == d_start_month
             if is_abm:
                 cell.fill = PatternFill(start_color="E0E7FF", end_color="E0E7FF", fill_type="solid")
             else:
@@ -1454,16 +1669,46 @@ def download_attendance(month: int, year: int, location: str, warehouse: str):
             emp["emp_id"],
             emp["emp_name"],
             emp["department"],
-            emp["designation"]
+            emp["designation"],
+            emp.get("doj", "")
         ]
         
         days_dict = emp.get("days", {})
+        doj_str = emp.get("doj")
+        doj_date = None
+        if doj_str:
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d %B %Y"):
+                try:
+                    doj_date = datetime.strptime(str(doj_str).strip(), fmt).date()
+                    break
+                except ValueError:
+                    pass
+
+        leaving_str = emp.get("leaving_date")
+        leaving_date = None
+        if leaving_str:
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d %B %Y"):
+                try:
+                    leaving_date = datetime.strptime(str(leaving_str).strip(), fmt).date()
+                    break
+                except ValueError:
+                    pass
+
         for d in dates:
             d_str = d.strftime("%Y-%m-%d")
             fallback = days_dict.get(str(d.day))
             val = days_dict.get(d_str, fallback) or ""
-            if d.weekday() == 6 and not val:
-                val = "WO"
+            if doj_date and d < doj_date:
+                val = ""
+            elif leaving_date and d > leaving_date:
+                val = "L"
+            elif val == "L":
+                val = "L"
+            elif not val:
+                if d.weekday() == 6:
+                    val = "WO"
+                else:
+                    val = "P"
             row.append(val)
             
         row.extend([

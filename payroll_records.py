@@ -29,6 +29,7 @@ Schema:
 from datetime import datetime
 from salary_calc import recalculate
 from attendance_engine import _calc_attendance
+from employee_master import is_employee_eligible_for_month
 
 PAYROLL_COLLECTION = "payroll_records"
 ATTENDANCE_COLLECTION = "_attendance"
@@ -37,19 +38,20 @@ ATTENDANCE_COLLECTION = "_attendance"
 def generate_monthly_payroll(month: int, year: int,
                               location: str, warehouse: str, db) -> dict:
     """
-    Create payroll records for every active employee matching
+    Create payroll records for every active/eligible employee matching
     location + warehouse, for the given month/year.
 
     - Already-existing records are NOT overwritten (idempotent).
     - Returns {"created": N, "skipped": N}
     """
-    master_query = {"status": "active"}
+    master_query = {}
     if location:  master_query["location"]  = location
     if warehouse: master_query["warehouse"] = warehouse
 
-    employees = list(db["employee_master"].find(master_query))
+    all_employees = list(db["employee_master"].find(master_query))
+    employees = [emp for emp in all_employees if is_employee_eligible_for_month(emp, month, year)]
     if not employees:
-        return {"created": 0, "skipped": 0, "error": "No active employees found"}
+        return {"created": 0, "skipped": 0, "error": "No eligible employees found"}
 
     created = skipped = 0
     for emp in employees:
@@ -75,8 +77,9 @@ def generate_monthly_payroll(month: int, year: int,
             fixed_wd = float(fixed_wd)
         except (ValueError, TypeError):
             fixed_wd = None
-        doj_str = emp.get("DOJ")
-        present, absent, pay, lop, wd = _calc_attendance(emp["emp_id"], emp["location"], emp["warehouse"], month, year, full_days, fixed_wd, doj_str=doj_str)
+        doj_str = emp.get("doj") or emp.get("DOJ") or (emp.get("identity", {}).get("DOJ") if isinstance(emp.get("identity"), dict) else None)
+        leaving_date_str = emp.get("leaving_date") or (emp.get("identity", {}).get("DOL") or emp.get("identity", {}).get("leaving_date") if isinstance(emp.get("identity"), dict) else None)
+        present, absent, pay, lop, wd = _calc_attendance(emp["emp_id"], emp["location"], emp["warehouse"], month, year, full_days, fixed_wd, doj_str=doj_str, leaving_date_str=leaving_date_str)
 
         attendance = {
             "ATTENDANCE - Present Days": present,

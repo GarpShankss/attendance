@@ -92,13 +92,17 @@
   table.att td.sticky-col { position: sticky; z-index: 11; background: var(--surface); box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
   table.att th.sticky-col { position: sticky; z-index: 12; background: #fef3c7 !important; box-shadow: 2px 0 5px rgba(0,0,0,0.02); }
   
-  .att-col-action { left: 0; min-width: 110px; max-width: 110px; }
-  .att-col-id { left: 110px; min-width: 90px; max-width: 90px; }
-  .att-col-name { left: 200px; min-width: 140px; max-width: 140px; border-right: 2px solid var(--border) !important; }
+  .att-col-action { left: 0; min-width: 145px; max-width: 145px; }
+  .att-col-id { left: 145px; min-width: 85px; max-width: 85px; }
+  .att-col-name { left: 230px; min-width: 140px; max-width: 140px; border-right: 2px solid var(--border) !important; }
   
-  .btn-att-save, .btn-att-delete { padding: 4px 8px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  .btn-att-save, .btn-att-delete, .btn-att-left { padding: 4px 7px; font-size: 11px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-weight: 500; }
   .btn-att-save:hover { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
   .btn-att-delete:hover { background: #fee2e2; color: var(--danger); border-color: var(--danger); }
+  .btn-att-left { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+  .btn-att-left:hover { background: #fef3c7; color: #92400e; border-color: #f59e0b; }
+  .badge-left { display: inline-flex; align-items: center; padding: 3px 6px; font-size: 10px; border-radius: 4px; background: #fee2e2; color: #991b1b; font-weight: 600; cursor: pointer; border: 1px solid #fca5a5; }
+  .badge-left:hover { background: #fecaca; }
   
   /* Attendance Status Colors */
   table.att input.day-inp { width: 36px; height: 36px; text-align: center; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; text-transform: uppercase; font-weight: 600; background: var(--surface); color: var(--text); padding: 0; display: inline-flex; align-items: center; justify-content: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
@@ -112,6 +116,7 @@
   table.att input.day-inp.status-pl { background: #9333ea; color: white; border-color: transparent; }
   table.att input.day-inp.status-cl { background: #9333ea; color: white; border-color: transparent; }
   table.att input.day-inp.status-a  { background: var(--danger); color: white; border-color: transparent; }
+  table.att input.day-inp.status-l  { background: #64748b; color: white; border-color: transparent; }
   
   table.att td.summary { background: #f9fafb; font-weight: 600; }
   
@@ -175,12 +180,13 @@
 </nav>
 
 <div class="legend-bar">
-  <div class="legend-item"><div class="legend-color legend-p"></div> Present</div>
-  <div class="legend-item"><div class="legend-color legend-wo"></div> Week Off</div>
-  <div class="legend-item"><div class="legend-color legend-hl"></div> Half Leave</div>
-  <div class="legend-item"><div class="legend-color legend-sl"></div> Sick Leave</div>
-  <div class="legend-item"><div class="legend-color legend-pl"></div> Privilege Leave</div>
-  <div class="legend-item"><div class="legend-color legend-a"></div> Absent</div>
+  <div class="legend-item"><div class="legend-color legend-p"></div> Present (P)</div>
+  <div class="legend-item"><div class="legend-color legend-wo"></div> Week Off (WO)</div>
+  <div class="legend-item"><div class="legend-color legend-hl"></div> Half Leave (HL)</div>
+  <div class="legend-item"><div class="legend-color legend-sl"></div> Sick Leave (SL)</div>
+  <div class="legend-item"><div class="legend-color legend-pl"></div> Privilege Leave (PL)</div>
+  <div class="legend-item"><div class="legend-color legend-a"></div> Absent (A)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#64748b;"></div> Discontinued / Left (L)</div>
 </div>
 
 <div class="loader-overlay" id="globalLoader">
@@ -363,7 +369,7 @@ function renderTable(employees) {
 
   let head = `<thead>
     <tr>
-      <th colspan="5" style="background:#fef3c7; color:#92400e; text-align:center;">Employee Details</th>
+      <th colspan="6" style="background:#fef3c7; color:#92400e; text-align:center;">Employee Details</th>
       <th colspan="${abmCount}" style="background:#e0e7ff; color:#3730a3; text-align:center;">ABM (Attendance Before Month)</th>
       <th colspan="${acmCount}" style="background:#dcfce7; color:#166534; text-align:center;">ACM (Attendance Current Month)</th>
       <th colspan="7" style="background:#fef3c7; color:#92400e; text-align:center;">Summary</th>
@@ -373,7 +379,8 @@ function renderTable(employees) {
       <th class="sticky-col att-col-id" style="color:#92400e;">ID</th>
       <th class="sticky-col att-col-name" style="color:#92400e;">Name</th>
       <th style="min-width:120px; background:#fef3c7; color:#92400e;">Department</th>
-      <th style="min-width:120px; background:#fef3c7; color:#92400e;">Designation</th>`;
+      <th style="min-width:120px; background:#fef3c7; color:#92400e;">Designation</th>
+      <th style="min-width:130px; background:#fef3c7; color:#92400e;">DOJ</th>`;
 
   for (const date of dates) {
     const dow  = date.getDay();
@@ -403,18 +410,27 @@ function renderTable(employees) {
   let body = '<tbody>';
   for (const emp of employees) {
     body += `<tr data-emp-id="${esc(emp.emp_id)}" data-working-days="${emp.working_days || 0}" data-working-source="${esc(emp.working_source || 'Unknown')}">`;
+    
+    let leftBtnHtml = '';
+    if (emp.status === 'left' || emp.leaving_date) {
+      leftBtnHtml = `<button type="button" class="badge-left" onclick="markEmployeeLeft('${esc(emp.emp_id)}', '${esc(emp.emp_name)}', '${esc(emp.leaving_date || '')}', 'left')" title="Left on ${esc(emp.leaving_date || '')}. Click to view/reactivate.">Left</button>`;
+    } else {
+      leftBtnHtml = `<button type="button" class="btn-att-left" onclick="markEmployeeLeft('${esc(emp.emp_id)}', '${esc(emp.emp_name)}', '', 'active')" title="Mark Discontinued / Left">Left</button>`;
+    }
+
     body += `<td class="sticky-col att-col-action">
-      <div style="display:flex; gap:4px; justify-content:center;">
-        <button class="btn-att-save" onclick="saveAttendanceEmployee('${esc(emp.emp_id)}')">Save</button>
-        <button class="btn-att-delete" onclick="deleteAttendanceEmployee('${esc(emp.emp_id)}')">Del</button>
+      <div style="display:flex; gap:4px; justify-content:center; align-items:center;">
+        <button type="button" class="btn-att-save" onclick="saveAttendanceEmployee('${esc(emp.emp_id)}')">Save</button>
+        ${leftBtnHtml}
+        <button type="button" class="btn-att-delete" onclick="deleteAttendanceEmployee('${esc(emp.emp_id)}')">Del</button>
       </div>
     </td>`;
     body += `<td class="sticky-col att-col-id">${esc(emp.emp_id)}</td>`;
     body += `<td class="sticky-col att-col-name" style="font-weight:500;">${esc(emp.emp_name)}</td>`;
     body += `<td>${esc(emp.department || '')}</td>`;
     body += `<td>${esc(emp.designation || '')}</td>`;
+    body += `<td><input type="date" value="${esc(emp.doj || '')}" class="doj-inp" onchange="onDojChange('${esc(emp.emp_id)}', this.value)" title="Date of Joining" style="padding:4px 6px; font-size:12px; border:1px solid var(--border); border-radius:4px; width:125px;"></td>`;
     
-    let working = 0, present = emp.present_days || 0, absent = emp.absent_days || 0;
     let dayCells = '';
     
     let dojDate = null;
@@ -426,6 +442,15 @@ function renderTable(employees) {
       }
     }
 
+    let leavingDate = null;
+    if (emp.leaving_date) {
+      let parts = emp.leaving_date.split(/[-.\/ ]/);
+      if (parts.length === 3) {
+        if (parts[0].length === 4) leavingDate = new Date(parts[0], parts[1]-1, parts[2]);
+        else if (parts[2].length === 4) leavingDate = new Date(parts[2], parts[1]-1, parts[0]);
+      }
+    }
+
     for (const date of dates) {
       const key = localISODate(date);
       const fallback = emp.days[String(date.getDate())];
@@ -434,12 +459,22 @@ function renderTable(employees) {
       
       let disabledAttr = '';
       if (dojDate && date < dojDate) {
-         disabledAttr = ' disabled style="background:rgba(255,255,255,0.05); color:transparent; cursor:not-allowed;" title="Before DOJ"';
+         disabledAttr = ' disabled style="background:rgba(255,255,255,0.05); color:transparent; cursor:not-allowed;" title="Before Date of Joining"';
          val = '';
+      } else if (leavingDate && date > leavingDate) {
+         disabledAttr = ' disabled style="background:#e2e8f0; color:#475569; cursor:not-allowed;" title="Discontinued / Left"';
+         val = 'L';
+      } else if (val === 'L') {
+         disabledAttr = ' disabled style="background:#e2e8f0; color:#475569; cursor:not-allowed;" title="Discontinued / Left"';
       }
       
-      if (dow === 0 && !val && !disabledAttr) {
-        val = 'WO';
+      // Defaulting to Present ("P") and Sunday ("WO") for active employment days
+      if (!val && !disabledAttr) {
+        if (dow === 0) {
+          val = 'WO';
+        } else {
+          val = 'P';
+        }
       }
       
       let classes = [];
@@ -452,12 +487,9 @@ function renderTable(employees) {
       const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
 
       const valid = Object.keys(currentPolicy);
-      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : 'status-blank';
+      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : (val === 'L' ? 'status-l' : 'status-blank');
       dayCells += `<td${classAttr}><input class="day-inp ${cls}" type="text" maxlength="2"`
             + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)" onkeydown="onDayKeyDown(event, this)"${disabledAttr}></td>`;
-            
-      const v = val.toLowerCase();
-      // Initial render doesn't compute working/present; we'll recalculate exactly at the end
     }
     
     body += dayCells;
@@ -473,7 +505,7 @@ function renderTable(employees) {
   body += '</tbody>';
   document.getElementById('attTable').innerHTML = head + body;
   
-  // Re-run summary computation for all rows to ensure exact 26th-25th calculation
+  // Re-run summary computation for all rows to ensure exact calculation
   document.querySelectorAll('#attTable tbody tr').forEach(tr => {
     const firstInp = tr.querySelector('input.day-inp');
     if (firstInp) onDayInput(firstInp);
@@ -488,11 +520,11 @@ function onDayInput(inp) {
   if (!uiVal) {
      const dt = new Date(inp.dataset.day);
      if (dt.getDay() === 0) logicalVal = 'WO';
-     else logicalVal = 'A';
+     else logicalVal = 'P';
   }
 
   const valid = Object.keys(currentPolicy);
-  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : 'status-blank';
+  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : (uiVal === 'L' ? 'status-l' : 'status-blank');
   inp.className = 'day-inp ' + cls;
 
   // live summary
@@ -500,18 +532,26 @@ function onDayInput(inp) {
   let present = 0, absent = 0, lop = 0;
   let abmTotal = 0, acmTotal = 0;
   const working = parseFloat(tr.dataset.workingDays) || 0;
-  const workingSource = tr.dataset.workingSource || "Unknown";
+  let unemployedDays = 0;
   
   const cutoffStart = localISODate(new Date(currentYear, currentMonth - 2, 26));
   const cutoffEnd = localISODate(new Date(currentYear, currentMonth - 1, 25));
 
   tr.querySelectorAll('input.day-inp').forEach(i => {
     const dStr = i.dataset.day;
+    if (i.disabled) {
+      unemployedDays += 1;
+      return;
+    }
     let v = i.value.trim().toUpperCase();
     if (!v) {
        const dt = new Date(dStr);
        if (dt.getDay() === 0) v = 'WO';
-       else v = 'A';
+       else v = 'P';
+    }
+    if (v === 'L') {
+      unemployedDays += 1;
+      return;
     }
 
     const isABM = i.closest('td').classList.contains('td-abm');
@@ -532,7 +572,8 @@ function onDayInput(inp) {
     }
   });
   
-  const pay = Math.max(0, working - lop);
+  const effectiveWd = Math.max(0, working - unemployedDays);
+  const pay = Math.max(0, effectiveWd - lop);
   present = pay;  // Present Days is padded to match Working Days - LOP
   
   tr.querySelector('[data-type="working"]').textContent = working;
@@ -728,72 +769,164 @@ async function downloadAttendanceExcel() {
 
 boot();
 
+let currentTargetEmpId = null;
 
-// Toasts
-  function showToast(message, type = 'success') {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'toast-container';
-      document.body.appendChild(container);
-    }
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `<span>${message}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
-  }
+function markEmployeeLeft(empId, empName, currentDol, status) {
+  currentTargetEmpId = empId;
+  document.getElementById('leftModalEmpName').textContent = `Employee: ${empName} (${empId})`;
   
-  // Also fix the actions TD to stick
+  const now = new Date();
+  const defDate = currentDol || localISODate(now);
+  document.getElementById('leftModalDate').value = defDate;
 
-
-
-  // Toasts and Loader functions
-  function showToast(message, type = 'success') {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'toast-container';
-      document.body.appendChild(container);
-    }
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    
-    let icon = '';
-    if(type === 'success') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
-    if(type === 'error') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
-    if(type === 'warning') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
-    
-    toast.innerHTML = `${icon}<span>${message}</span>`;
-    container.appendChild(toast);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
+  const reactivateBtn = document.getElementById('leftModalReactivateBtn');
+  if (status === 'left' || currentDol) {
+    reactivateBtn.style.display = 'inline-flex';
+  } else {
+    reactivateBtn.style.display = 'none';
   }
 
-  function showLoader(text) {
-    const loader = document.getElementById('globalLoader');
-    if(loader) {
-      document.getElementById('loaderText').textContent = text || 'Processing...';
-      loader.style.display = 'flex';
-    }
+  document.getElementById('leftModal').style.display = 'flex';
+}
+
+function closeLeftModal() {
+  document.getElementById('leftModal').style.display = 'none';
+  currentTargetEmpId = null;
+}
+
+async function confirmMarkEmployeeLeft() {
+  if (!currentTargetEmpId) return;
+  const dol = document.getElementById('leftModalDate').value;
+  if (!dol) {
+    showToast('Please specify a Date of Leaving (DOL).', 'warning');
+    return;
   }
+
+  showLoader('Marking employee as Left...');
+  try {
+    const res = await fetch(`/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(currentTargetEmpId)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'left',
+        leaving_date: dol,
+        month: currentMonth,
+        year: currentYear
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    closeLeftModal();
+    showToast('Employee marked as Discontinued / Left ✓', 'success');
+    await loadAttendance();
+  } catch (err) {
+    showToast('Failed to mark as left: ' + err.message, 'error');
+  } finally {
+    hideLoader();
+  }
+}
+
+async function confirmReactivateEmployee() {
+  if (!currentTargetEmpId) return;
+  showLoader('Reactivating employee...');
+  try {
+    const res = await fetch(`/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(currentTargetEmpId)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'active',
+        month: currentMonth,
+        year: currentYear
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    closeLeftModal();
+    showToast('Employee reactivated to Active status ✓', 'success');
+    await loadAttendance();
+  } catch (err) {
+    showToast('Failed to reactivate: ' + err.message, 'error');
+  } finally {
+    hideLoader();
+  }
+}
+
+async function onDojChange(empId, newDoj) {
+  try {
+    const res = await fetch(`/employee/${encodeURIComponent(currentLocation)}/${encodeURIComponent(currentWarehouse)}/${encodeURIComponent(empId)}/doj`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        doj: newDoj,
+        month: currentMonth,
+        year: currentYear
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast(`DOJ updated for ${empId} ✓`, 'success');
+    await loadAttendance();
+  } catch (err) {
+    showToast('Failed to update DOJ: ' + err.message, 'error');
+  }
+}
+
+// Toasts and Loader functions
+function showToast(message, type = 'success') {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
   
-  function hideLoader() {
-    const loader = document.getElementById('globalLoader');
-    if(loader) loader.style.display = 'none';
-  }
+  let icon = '';
+  if(type === 'success') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+  if(type === 'error') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+  if(type === 'warning') icon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>';
   
-  document.getElementById('logoutBtn').addEventListener('click', () => {
-    localStorage.removeItem('rs_auth');
-    window.location.href = '/login.html';
-  });
+  toast.innerHTML = `${icon}<span>${message}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+function showLoader(text) {
+  const loader = document.getElementById('globalLoader');
+  if(loader) {
+    document.getElementById('loaderText').textContent = text || 'Processing...';
+    loader.style.display = 'flex';
+  }
+}
+
+function hideLoader() {
+  const loader = document.getElementById('globalLoader');
+  if(loader) loader.style.display = 'none';
+}
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+  localStorage.removeItem('rs_auth');
+  window.location.href = '/login.html';
+});
 </script>
+
+<div id="leftModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:3000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:8px; padding:24px; max-width:420px; width:90%; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+    <h3 style="margin:0 0 8px 0; font-size:16px; font-weight:600; color:var(--text);">Mark Employee as Discontinued / Left</h3>
+    <p id="leftModalEmpName" style="color:var(--text-muted); font-size:13px; margin:0 0 16px 0;"></p>
+    <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:20px;">
+      <label style="font-size:13px; font-weight:500; color:var(--text);">Date of Leaving (DOL) *</label>
+      <input type="date" id="leftModalDate" style="padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; width:100%;">
+      <small style="color:var(--text-muted); font-size:11px; margin-top:4px;">Days after this date in current cycle will be marked 'L' (Left). The employee will not appear in attendance or salary sheets for subsequent months.</small>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button type="button" class="btn-outline" onclick="closeLeftModal()">Cancel</button>
+      <button type="button" class="btn-warning" id="leftModalReactivateBtn" style="display:none;" onclick="confirmReactivateEmployee()">Reactivate</button>
+      <button type="button" class="btn-danger" id="leftModalConfirmBtn" onclick="confirmMarkEmployeeLeft()">Confirm Left</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

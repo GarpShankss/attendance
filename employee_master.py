@@ -34,7 +34,68 @@ Schema of each employee_master document:
 }
 """
 import re
-from datetime import datetime
+from datetime import datetime, date
+
+def is_employee_eligible_for_month(emp: dict, month: int, year: int) -> bool:
+    """
+    Check if an employee is eligible to appear in the given month/year cycle.
+    - Excludes employees whose joining date (DOJ) is after the cycle end (25th of month/year).
+    - Excludes employees whose leaving date is before the cycle start (26th of prev month).
+    """
+    # 1. Check Date of Joining (DOJ)
+    doj_str = emp.get("doj") or (emp.get("identity", {}).get("DOJ") if isinstance(emp.get("identity"), dict) else None)
+    if doj_str:
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d %B %Y"):
+            try:
+                d_obj = datetime.strptime(str(doj_str).strip(), fmt).date()
+                cycle_end = date(year, month, 25)
+                if d_obj > cycle_end:
+                    return False
+                break
+            except ValueError:
+                continue
+    else:
+        jy = emp.get("joined_year")
+        jm = emp.get("joined_month")
+        if jy and jm:
+            try:
+                jy, jm = int(jy), int(jm)
+                if (jy > year) or (jy == year and jm > month):
+                    return False
+            except (ValueError, TypeError):
+                pass
+
+    # 2. Check Date of Leaving (DOL) / status
+    status = str(emp.get("status") or "active").strip().lower()
+    if status in ("left", "discontinued", "inactive"):
+        leaving_date_str = emp.get("leaving_date") or (emp.get("identity", {}).get("DOL") or emp.get("identity", {}).get("leaving_date") if isinstance(emp.get("identity"), dict) else None)
+        if leaving_date_str:
+            for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d.%m.%Y", "%d %b %Y", "%d %B %Y"):
+                try:
+                    l_obj = datetime.strptime(str(leaving_date_str).strip(), fmt).date()
+                    prev_m = 12 if month == 1 else month - 1
+                    prev_y = year - 1 if month == 1 else year
+                    cycle_start = date(prev_y, prev_m, 26)
+                    if l_obj < cycle_start:
+                        return False
+                    break
+                except ValueError:
+                    continue
+        else:
+            ly = emp.get("left_year")
+            lm = emp.get("left_month")
+            if ly and lm:
+                try:
+                    ly, lm = int(ly), int(lm)
+                    if (ly < year) or (ly == year and lm < month):
+                        return False
+                except (ValueError, TypeError):
+                    pass
+            else:
+                return False
+
+    return True
+
 
 # Columns that belong in salary.  Everything else goes into identity.
 SALARY_PREFIX = ("FIXED -", "CONTRIBUTION -", "Deductions -")
