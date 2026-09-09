@@ -175,13 +175,12 @@ def get(row: dict, field: str, default=0):
     if field == "advance":
         for k, v in row.items():
             nk = _re.sub(r'[\s]+', ' ', str(k)).strip().lower()
-            if nk == "adv" or nk == "advance" or "advance" in nk or nk.endswith(" adv") or nk.endswith(" advance"):
-                return _num(v, default)
-
     return default
 
+
 def normalize_row(row: dict) -> dict:
-    """Standardize the keys of a raw Excel row to match exactly the COLUMN_MAP."""
+    """Standardize the keys of a raw Excel row to match exactly the COLUMN_MAP, and ensure financial floats are cleanly rounded."""
+
     import re as _re
     normalized = {}
     
@@ -199,23 +198,30 @@ def normalize_row(row: dict) -> dict:
 
         k_norm = _re.sub(r'[\s]+', ' ', k).strip().lower()
         
+        target_col = None
         if k_norm == "adv" or k_norm == "advance" or "advance" in k_norm or k_norm.endswith(" adv") or k_norm.endswith(" advance"):
-            normalized[COLUMN_MAP["advance"]] = v
-            continue
-
-        if k_norm in alias_map:
-            normalized[alias_map[k_norm]] = v
-            continue
-
-        matched = False
-        for target_key in COLUMN_MAP.values():
-            if target_key and _re.sub(r'[\s]+', ' ', target_key).strip().lower() == k_norm:
-                normalized[target_key] = v
-                matched = True
-                break
+            target_col = COLUMN_MAP["advance"]
+        elif k_norm in alias_map:
+            target_col = alias_map[k_norm]
+        else:
+            for target_key in COLUMN_MAP.values():
+                if target_key and _re.sub(r'[\s]+', ' ', target_key).strip().lower() == k_norm:
+                    target_col = target_key
+                    break
         
-        if not matched:
-            normalized[k] = v
+        final_key = target_col or k
+        
+        # Cleanly convert/round numeric values
+        if isinstance(v, float):
+            k_check = final_key.lower()
+            if any(id_k in k_check for id_k in ("account", "mobile", "phone", "contact", "uan", "ifsc", "emp_id", "esic", "sl.no", "sl no", "sl_no")):
+                normalized[final_key] = str(int(v)) if v.is_integer() else str(v)
+            elif "days" in k_check or "day" in k_check or "hours" in k_check:
+                normalized[final_key] = round(v, 1) if (v % 1 != 0) else int(v)
+            else:
+                normalized[final_key] = R(v)
+        else:
+            normalized[final_key] = v
 
     return normalized
 
@@ -296,19 +302,34 @@ def recalculate(row: dict) -> dict:
     if working_days <= 0:
         working_days = 30
 
-    # ── Fixed inputs ─────────────────────────────────────────────────────────
-    fixed_basic = get(r, "fixed_basic")
-    fixed_da    = get(r, "fixed_da")
-    fixed_other = get(r, "fixed_other")
-    fixed_spl   = get(r, "fixed_spl")
-    fixed_leave = get(r, "fixed_leave")
-    fixed_bonus = get(r, "fixed_bonus")
-    fixed_hra   = get(r, "fixed_hra")
-    advance     = get(r, "advance")
-    fixed_sc    = get(r, "fixed_service_charge")
-    uniform     = get(r, "uniform")
-    fixed_tshirt = get(r, "fixed_tshirt")
-    fixed_shoes  = get(r, "fixed_shoes")
+    # ── Fixed inputs (cleanly rounded to whole rupees) ──────────────────────
+    fixed_basic  = R(get(r, "fixed_basic"))
+    fixed_da     = R(get(r, "fixed_da"))
+    fixed_other  = R(get(r, "fixed_other"))
+    fixed_spl    = R(get(r, "fixed_spl"))
+    fixed_leave  = R(get(r, "fixed_leave"))
+    fixed_bonus  = R(get(r, "fixed_bonus"))
+    fixed_hra    = R(get(r, "fixed_hra"))
+    advance      = R(get(r, "advance"))
+    fixed_sc     = R(get(r, "fixed_service_charge"))
+    uniform      = R(get(r, "uniform"))
+    fixed_tshirt = R(get(r, "fixed_tshirt"))
+    fixed_shoes  = R(get(r, "fixed_shoes"))
+    fixed_total  = R(fixed_basic + fixed_da + fixed_other + fixed_spl + fixed_leave + fixed_bonus + fixed_hra)
+
+    # Clean up fixed values in dict to remove any floating decimals from raw Excel
+    for fk, fval in [
+        ("fixed_basic", fixed_basic), ("fixed_da", fixed_da),
+        ("fixed_other", fixed_other), ("fixed_spl", fixed_spl),
+        ("fixed_leave", fixed_leave), ("fixed_bonus", fixed_bonus),
+        ("fixed_hra", fixed_hra), ("fixed_total", fixed_total),
+        ("fixed_service_charge", fixed_sc), ("uniform", uniform),
+        ("fixed_tshirt", fixed_tshirt), ("fixed_shoes", fixed_shoes),
+        ("advance", advance),
+    ]:
+        col = COLUMN_MAP.get(fk)
+        if col and col in r and isinstance(r[col], (int, float)):
+            r[col] = fval
 
     L("=" * 60)
     L("SALARY CALCULATION LOG")
@@ -372,7 +393,7 @@ def recalculate(row: dict) -> dict:
     L(f"  Earned HRA    = ROUND({fixed_hra} / {working_days} × {pay_days}, 0)"
       f"  = ROUND({fixed_hra / working_days * pay_days:.4f}, 0)  = {earned_hra}")
       
-    earned_ot = get(r, "earned_ot")
+    earned_ot = R(get(r, "earned_ot"))
     L(f"  Earned OT Amount = {earned_ot}")
     L("")
 
@@ -486,14 +507,14 @@ def recalculate(row: dict) -> dict:
     L("")
 
     # ── Service Charge ───────────────────────────────────────────────────────
-    service_charge = fixed_sc
-    L("── SERVICE CHARGE  [Used As-Is] ─────────────────────────────────────────")
+    service_charge = R(fixed_sc)
+    L("── SERVICE CHARGE  [Rounded] ──────────────────────────────────────────────")
     L(f"  = {service_charge}")
     L("")
 
     # ── Total CTC ────────────────────────────────────────────────────────────
-    total_ctc = ctc + service_charge + uniform + fixed_tshirt + fixed_shoes
-    L("── TOTAL CTC  [CTC + Service Charge + Uniform + T Shirt + Shoes] ─")
+    total_ctc = R(ctc + service_charge + uniform + fixed_tshirt + fixed_shoes)
+    L("── TOTAL CTC  [ROUND(CTC + Service Charge + Uniform + T Shirt + Shoes, 0)] ─")
     L(f"  = {ctc} + {service_charge} + {uniform} + {fixed_tshirt} + {fixed_shoes}  = {total_ctc}")
     L("")
     L("── SUMMARY ─────────────────────────────────────────────────")
@@ -540,10 +561,12 @@ def recalculate(row: dict) -> dict:
     put(r, "emp_esi",         emp_esi)
     put(r, "emp_contribution", emp_contribution)
     put(r, "ctc",             ctc)
+    put(r, "fixed_service_charge", service_charge)
     put(r, "total_ctc",       total_ctc)
 
     r["__calc_log__"] = log
     return r
+
 
 
 # ---------------------------------------------------------------------------

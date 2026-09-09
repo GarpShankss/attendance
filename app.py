@@ -434,6 +434,36 @@ def _normalize_subdoc(value):
     return normalized
 
 
+def _clean_numeric_field(k: str, v):
+    if v is None or isinstance(v, (dict, list, bool)):
+        return v
+    k_lower = str(k).lower()
+    # Identification/contact fields that must stay strings
+    if any(id_key in k_lower for id_key in ("account", "uan", "esic", "ifsc", "mobile", "phone", "contact", "pan", "aadhar", "emp_id", "sl.no", "sl no")):
+        return str(v) if isinstance(v, (int, float)) and any(id_key in k_lower for id_key in ("account", "mobile", "phone", "contact", "uan", "esic", "aadhar")) else v
+    # Days and hours attendance fields
+    if any(day_key in k_lower for day_key in ("day", "hour", "ot hours", "lop")):
+        try:
+            fv = float(v)
+            return round(fv, 1) if fv % 1 != 0 else int(fv)
+        except (ValueError, TypeError):
+            return v
+    # Financial / monetary values
+    import math
+    if isinstance(v, (int, float)):
+        return int(math.floor(float(v) + 0.5))
+    if isinstance(v, str):
+        v_str = v.strip().replace(",", "")
+        try:
+            fv = float(v_str)
+            # If string is purely a number in a non-ID column, round to int
+            if not any(c.isalpha() for c in v_str):
+                return int(math.floor(fv + 0.5))
+        except ValueError:
+            pass
+    return v
+
+
 def _flatten_doc(doc: dict):
     flat = {}
     flat["_id"] = str(doc.get("_id")) if doc.get("_id") else None
@@ -453,7 +483,11 @@ def _flatten_doc(doc: dict):
         fully_flat["Net Pay"] = fully_flat["net_pay"]
     if "Net Pay" in fully_flat and "net_pay" in fully_flat:
         del fully_flat["net_pay"]
-    return fully_flat
+
+    cleaned = {}
+    for k, v in fully_flat.items():
+        cleaned[k] = _clean_numeric_field(k, v)
+    return cleaned
 
 
 def _row_filter(name: str, row_id: str):
@@ -978,7 +1012,10 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
             cell = ws.cell(row=row_idx, column=c_idx, value=val)
             cell.border = border_thin
             if isinstance(val, (int, float)):
-                cell.number_format = '#,##0.00'
+                if isinstance(val, float) and val % 1 != 0:
+                    cell.number_format = '#,##0.0'
+                else:
+                    cell.number_format = '#,##0'
         row_idx += 1
 
     # Totals Row
@@ -996,7 +1033,7 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
             cell = ws.cell(row=row_idx, column=c_idx, value=f"=SUM({col_letter}3:{col_letter}{row_idx-1})")
             cell.font = Font(bold=True)
             cell.border = border_thin
-            cell.number_format = '#,##0.00'
+            cell.number_format = '#,##0'
 
     # Auto-fit columns
     for col in ws.columns:

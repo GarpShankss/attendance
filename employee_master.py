@@ -33,7 +33,7 @@ Schema of each employee_master document:
     "last_source":  "RSM_MAY_2026.xlsx",
 }
 """
-import re
+import re, math
 from datetime import datetime, date
 
 def is_employee_eligible_for_month(emp: dict, month: int, year: int) -> bool:
@@ -149,7 +149,13 @@ def upsert_employees(rows: list, location: str, warehouse: str,
             if v is None:
                 continue
             if any(k.startswith(p) for p in SALARY_PREFIX):
-                salary[k] = v
+                if isinstance(v, (int, float)):
+                    if "Day" in k or "day" in k or "Hour" in k or "hour" in k:
+                        salary[k] = round(v, 1) if float(v) % 1 != 0 else int(v)
+                    else:
+                        salary[k] = int(math.floor(float(v) + 0.5))
+                else:
+                    salary[k] = v
             elif k not in (id_col,):
                 identity[k] = v
 

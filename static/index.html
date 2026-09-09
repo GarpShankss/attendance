@@ -917,8 +917,20 @@ function renderDataTable(columns, rows) {
       if (c === 'UAN' && !val) val = r['NAME - UAN'] || r['uan'] || '';
       if (c === 'IFSC' && !val) val = r['IFSC CODE'] || r['ifsc'] || '';
       
-      let isNumeric = !isNaN(parseFloat(val)) && isFinite(val) && val !== '';
-      if (isNumeric) totals[c] += parseFloat(val);
+      let isEmpDetail = COLUMN_GROUPS[0].cols.includes(c) || ['emp_id', 'Sl.No', 'Employee Name', 'NAME', 'Mobile Number', 'UAN', 'IFSC', 'ESIC', 'ACCOUNT', 'PAN', 'DOJ', 'Active Status', 'Department', 'Designation'].includes(c);
+      let isAttendance = (COLUMN_GROUPS[2] && COLUMN_GROUPS[2].cols.includes(c)) || c.toLowerCase().includes('day') || c.toLowerCase().includes('hour');
+      let isNumeric = !isNaN(parseFloat(val)) && isFinite(val) && val !== '' && !isEmpDetail;
+
+      let displayVal = val;
+      if (isNumeric) {
+        let numVal = parseFloat(val);
+        totals[c] += numVal;
+        if (isAttendance) {
+          displayVal = (numVal % 1 !== 0) ? (Math.round(numVal * 10) / 10).toString() : Math.round(numVal).toString();
+        } else {
+          displayVal = Math.round(numVal).toString();
+        }
+      }
       
       let extraClass = isNumeric ? 'numeric' : '';
       if (c === 'emp_id') extraClass += ' sticky-col emp-id-col';
@@ -926,10 +938,10 @@ function renderDataTable(columns, rows) {
       
       if (editingRows[rowKey] && !NON_EDITABLE_COLUMNS.has(c) && c !== 'emp_id' && c !== 'Employee Name') {
           tr += `<td class="${extraClass.trim()}">
-                   <input type="text" class="cell-input" data-col="${escapeAttr(c)}" value="${escapeHtml(val)}" />
+                   <input type="text" class="cell-input" data-col="${escapeAttr(c)}" value="${escapeHtml(displayVal)}" />
                  </td>`;
       } else {
-          tr += `<td data-col="${escapeAttr(c)}" class="${extraClass.trim()}">${escapeHtml(val)}</td>`;
+          tr += `<td data-col="${escapeAttr(c)}" class="${extraClass.trim()}">${escapeHtml(displayVal)}</td>`;
       }
     });
     tr += '</tr>';
@@ -942,8 +954,10 @@ function renderDataTable(columns, rows) {
     if (c === 'emp_id') extraClass += ' sticky-col emp-id-col';
     if (c === 'Employee Name') extraClass += ' sticky-col emp-name-col';
     
-    let isEmpDetail = COLUMN_GROUPS[0].cols.includes(c);
-    let val = isEmpDetail ? '' : (totals[c] ? totals[c].toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : '0');
+    let isEmpDetail = COLUMN_GROUPS[0].cols.includes(c) || ['emp_id', 'Sl.No', 'Employee Name', 'NAME', 'Mobile Number', 'UAN', 'IFSC', 'ESIC', 'ACCOUNT', 'PAN', 'DOJ', 'Active Status', 'Department', 'Designation'].includes(c);
+    let isAttendance = (COLUMN_GROUPS[2] && COLUMN_GROUPS[2].cols.includes(c)) || c.toLowerCase().includes('day') || c.toLowerCase().includes('hour');
+    let totalVal = totals[c];
+    let val = isEmpDetail ? '' : (totalVal ? (isAttendance && (totalVal % 1 !== 0) ? (Math.round(totalVal * 10) / 10).toLocaleString('en-IN') : Math.round(totalVal).toLocaleString('en-IN')) : '0');
     foot += `<th class="${extraClass.trim()}" style="${!isEmpDetail ? 'text-align:right;' : ''}">${val}</th>`;
   });
   foot += '</tr></tfoot>';

@@ -50,7 +50,7 @@ def guess_warehouse(sheet_name, warehouse_list):
 
 
 
-from salary_calc import normalize_row
+from salary_calc import normalize_row, recalculate
 
 def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, source_file):
     """Load ONE already-parsed sheet into its own collection (cleared first)."""
@@ -61,6 +61,7 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
     docs = []
     for i, row in enumerate(rows, start=1):
         doc = normalize_row(dict(row))
+        doc = recalculate(doc)
         doc["_row_id"] = i
         doc["_source_file"] = source_file
         doc["_sheet"] = sheet_name
