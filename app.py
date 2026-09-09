@@ -888,6 +888,93 @@ def delete_employee_month(location: str, warehouse: str, emp_id: str, month: int
     }
 
 
+@app.post("/warehouse/delete")
+def delete_warehouse_data(payload: dict = Body(...)):
+    """
+    Erase all data for a specific warehouse / location completely from the database:
+    - employee_master
+    - payroll_records
+    - _attendance
+    - all dynamic sheet collections
+    """
+    location = payload.get("location")
+    warehouse = payload.get("warehouse")
+    month = payload.get("month")
+    year = payload.get("year")
+    delete_all = payload.get("delete_all", False)
+
+    if not delete_all and not warehouse and not location:
+        raise HTTPException(400, "Please specify a location or warehouse, or set delete_all=true.")
+
+    query_master = {}
+    query_payroll = {}
+    query_att = {}
+
+    if location and location != "ALL":
+        query_master["location"] = location
+        query_payroll["location"] = location
+        query_att["location"] = location
+    if warehouse and warehouse != "ALL":
+        query_master["warehouse"] = warehouse
+        query_payroll["warehouse"] = warehouse
+        query_att["warehouse"] = warehouse
+
+    if month and str(month).isdigit() and int(month) > 0:
+        query_payroll["month"] = int(month)
+    if year and str(year).isdigit() and int(year) > 0:
+        query_payroll["year"] = int(year)
+
+    deleted_summary = {
+        "employee_master": 0,
+        "payroll_records": 0,
+        "attendance": 0,
+        "sheet_collections_cleaned": []
+    }
+
+    # 1. Clear payroll records
+    pay_res = db[PAYROLL_COLLECTION].delete_many(query_payroll)
+    deleted_summary["payroll_records"] = pay_res.deleted_count
+
+    # 2. If deleting lifetime data (no specific month filter), clear master and attendance
+    if not (month and str(month).isdigit() and int(month) > 0):
+        master_res = db[MASTER_COLLECTION].delete_many(query_master)
+        deleted_summary["employee_master"] = master_res.deleted_count
+
+        att_res = db[ATTENDANCE_COLLECTION].delete_many(query_att)
+        deleted_summary["attendance"] = att_res.deleted_count
+
+    # 3. Clean dynamic sheet collections
+    all_colls = db.list_collection_names()
+    for name in all_colls:
+        if name in (MASTER_COLLECTION, PAYROLL_COLLECTION, ATTENDANCE_COLLECTION, "payroll_settings") or name.startswith("system."):
+            continue
+        coll = db[name]
+        q_dyn = {}
+        clauses = []
+        if location and location != "ALL":
+            clauses.append({"$or": [{"_location": location}, {"location": location}]})
+        if warehouse and warehouse != "ALL":
+            clauses.append({"$or": [{"_warehouse": warehouse}, {"warehouse": warehouse}]})
+        if month and str(month).isdigit() and int(month) > 0:
+            clauses.append({"$or": [{"_upload_month": int(month)}, {"month": int(month)}]})
+        if year and str(year).isdigit() and int(year) > 0:
+            clauses.append({"$or": [{"_upload_year": int(year)}, {"year": int(year)}]})
+
+        if clauses:
+            q_dyn = {"$and": clauses} if len(clauses) > 1 else clauses[0]
+
+        res = coll.delete_many(q_dyn)
+        if res.deleted_count > 0:
+            deleted_summary["sheet_collections_cleaned"].append(f"{name} ({res.deleted_count} rows)")
+        
+        # Drop dynamic collection if it is now completely empty
+        if coll.count_documents({}) == 0:
+            coll.drop()
+
+    broadcaster.broadcast("reload")
+    return {"ok": True, "summary": deleted_summary}
+
+
 @app.patch("/collections/{name}/{row_id}")
 def update_cell(name: str, row_id: str, payload: dict):
     column, value = payload.get("column"), payload.get("value")

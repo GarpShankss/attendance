@@ -449,6 +449,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         Bank Details
       </button>
+      <button id="btnDeleteWarehouseModal" class="btn-danger" style="margin-left: auto;" onclick="openDeleteWarehouseModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+        Delete Warehouse Data
+      </button>
     </div>
     <div id="generatePayrollStatus" style="font-size: 13px; margin-top: 8px; margin-bottom: 8px;"></div>
   </div>
@@ -1840,6 +1844,125 @@ loadSettings();
       showToast('WhatsApp dispatch failed: ' + e.message, 'error');
     }
   }
+
+  // --- Delete Warehouse & Clear Database Flow ---
+  function openDeleteWarehouseModal() {
+    const modal = document.getElementById('deleteWarehouseModal');
+    if (!modal) return;
+    
+    // Populate Locations
+    const locSelect = document.getElementById('delModalLocation');
+    const locations = Object.keys(WAREHOUSES);
+    const currFilterLoc = (els.filterLocation && els.filterLocation.value) || '';
+    
+    let locOptions = '<option value="ALL">-- ALL LOCATIONS --</option>';
+    locations.forEach(loc => {
+      const sel = loc === currFilterLoc ? 'selected' : '';
+      locOptions += `<option value="${escapeAttr(loc)}" ${sel}>${escapeHtml(loc)}</option>`;
+    });
+    locSelect.innerHTML = locOptions;
+
+    onDelModalLocationChange();
+
+    document.getElementById('delModalConfirmText').value = '';
+    checkDelConfirmation();
+    modal.style.display = 'flex';
+  }
+
+  function closeDeleteWarehouseModal() {
+    const modal = document.getElementById('deleteWarehouseModal');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function onDelModalLocationChange() {
+    const loc = document.getElementById('delModalLocation').value;
+    const whSelect = document.getElementById('delModalWarehouse');
+    const currFilterWh = (els.filterWarehouse && els.filterWarehouse.value) || '';
+    
+    let whs = [];
+    if (loc === 'ALL') {
+      whs = [...new Set(Object.values(WAREHOUSES).flat())];
+    } else {
+      whs = WAREHOUSES[loc] || [];
+    }
+
+    let whOptions = '<option value="ALL">-- ALL WAREHOUSES (FULL WIPE) --</option>';
+    whs.forEach(w => {
+      const sel = w === currFilterWh ? 'selected' : '';
+      whOptions += `<option value="${escapeAttr(w)}" ${sel}>${escapeHtml(w)}</option>`;
+    });
+    whSelect.innerHTML = whOptions;
+  }
+
+  function checkDelConfirmation() {
+    const text = (document.getElementById('delModalConfirmText').value || '').trim().toUpperCase();
+    const btn = document.getElementById('btnExecuteWarehouseDelete');
+    if (text === 'DELETE') {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    } else {
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.style.cursor = 'not-allowed';
+    }
+  }
+
+  async function executeWarehouseDelete() {
+    const loc = document.getElementById('delModalLocation').value;
+    const wh = document.getElementById('delModalWarehouse').value;
+    const scope = document.getElementById('delModalScope').value;
+
+    const payload = {
+      location: loc,
+      warehouse: wh,
+      delete_all: loc === 'ALL' && wh === 'ALL'
+    };
+
+    if (scope === 'month') {
+      const m = els.filterMonth ? els.filterMonth.value : '';
+      const y = els.filterYear ? els.filterYear.value : '';
+      if (!m || !y) {
+        showToast('Please select a Month and Year in the dashboard filters first for month-scoped deletion.', 'warning');
+        return;
+      }
+      payload.month = parseInt(m);
+      payload.year = parseInt(y);
+    }
+
+    const confirmMsg = `Are you ABSOLUTELY sure you want to delete data for:\n` +
+      `Location: ${loc}\n` +
+      `Warehouse: ${wh}\n` +
+      `Scope: ${scope === 'month' ? `Month ${payload.month}/${payload.year}` : 'Entire History (Lifetime & Employee Master)'}\n\n` +
+      `This action CANNOT be undone!`;
+
+    if (!confirm(confirmMsg)) return;
+
+    showLoader('Erasing warehouse data from database...');
+    try {
+      const res = await fetch('/warehouse/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      hideLoader();
+      if (!res.ok) throw new Error(data.detail || 'Failed to delete warehouse');
+
+      closeDeleteWarehouseModal();
+      const s = data.summary || {};
+      const msg = `Deleted: ${s.employee_master || 0} master employees, ${s.payroll_records || 0} payroll records, ${s.attendance || 0} attendance records.`;
+      showToast(msg, 'success');
+      
+      // Reload UI data & stats
+      if (typeof loadData === 'function') loadData();
+      if (typeof loadStats === 'function') loadStats();
+      if (typeof loadMonthYearOptions === 'function') loadMonthYearOptions();
+    } catch (e) {
+      hideLoader();
+      showToast('Deletion failed: ' + e.message, 'error');
+    }
+  }
 </script>
 
 <!-- Fitment Letter Modal -->
@@ -1997,6 +2120,59 @@ loadSettings();
           Send to WhatsApp
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Warehouse Data Modal -->
+<div id="deleteWarehouseModal" class="modal-overlay">
+  <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-header" style="background: #fef2f2; border-bottom: 1px solid #fee2e2;">
+      <div>
+        <h3 style="color: #991b1b; display: flex; align-items: center; gap: 8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Delete Warehouse / Clear Data
+        </h3>
+        <div style="font-size: 12px; color: #b91c1c; margin-top: 3px;">Permanently wipe selected warehouse records from database</div>
+      </div>
+      <button class="modal-close-btn" onclick="closeDeleteWarehouseModal()">&times;</button>
+    </div>
+
+    <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 6px; padding: 12px; font-size: 13px; color: #9f1239; line-height: 1.4;">
+        ⚠️ <strong>Warning:</strong> This will permanently erase employee master records, monthly payroll documents, attendance data, and uploaded sheets for the selected warehouse from MongoDB.
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--text);">Location</label>
+        <select id="delModalLocation" onchange="onDelModalLocationChange()" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border);"></select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--text);">Warehouse to Delete</label>
+        <select id="delModalWarehouse" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border);"></select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label style="font-size: 13px; font-weight: 600; color: var(--text);">Data Scope</label>
+        <select id="delModalScope" style="padding: 8px; border-radius: 6px; border: 1px solid var(--border);">
+          <option value="lifetime">Entire Warehouse (All Months &amp; Master Data - Full Wipe)</option>
+          <option value="month">Selected Month Only (from dashboard filters)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 12px;">
+        <label style="font-size: 13px; font-weight: 600; color: #dc2626;">Type "DELETE" to confirm:</label>
+        <input type="text" id="delModalConfirmText" placeholder="DELETE" oninput="checkDelConfirmation()" style="padding: 8px; border-radius: 6px; border: 1px solid #fca5a5;" />
+      </div>
+    </div>
+
+    <div class="modal-footer" style="padding: 16px 20px; background: #f8fafc; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <button class="btn-outline" onclick="closeDeleteWarehouseModal()">Cancel</button>
+      <button id="btnExecuteWarehouseDelete" class="btn-danger" disabled onclick="executeWarehouseDelete()" style="opacity: 0.5; cursor: not-allowed;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        Permanently Erase Warehouse Data
+      </button>
     </div>
   </div>
 </div>
