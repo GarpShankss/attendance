@@ -18,12 +18,36 @@ def slugify(name):
 def guess_warehouse(sheet_name, warehouse_list):
     """Best-effort default for the assignment UI - user can always override."""
     norm_sheet = re.sub(r"[^A-Z0-9]", "", sheet_name.upper())
+
+    # Direct keyword / alias matching for common warehouse names
+    aliases = {
+        "HANCHIPURA": "abb(HANCHIPURA)",
+        "HANCHI": "abb(HANCHIPURA)",
+        "NELAMANGLA": "abb(nelamangla)",
+        "NELAMANGALA": "abb(nelamangla)",
+        "NELMANGALA": "abb(nelamangla)",
+        "SHAWFLOOR": "Shaw Floor",
+        "SHAW": "Shaw Floor",
+        "UNICHARM": "Unicharm",
+        "HAVELLS": "Havells",
+        "SONY": "Sony",
+        "BAJAJ": "Bajaj",
+        "BOSCH": "Bosch",
+        "HAIER": "Haier",
+    }
+    for alias_key, target_wh in aliases.items():
+        if alias_key in norm_sheet:
+            for wh in warehouse_list:
+                if wh.upper() == target_wh.upper():
+                    return wh
+
     candidates = sorted(warehouse_list, key=len, reverse=True)  # longest name first
     for wh in candidates:
         norm_wh = re.sub(r"[^A-Z0-9]", "", wh.upper())
-        if norm_wh and norm_wh in norm_sheet:
+        if norm_wh and (norm_wh in norm_sheet or norm_sheet in norm_wh):
             return wh
     return None
+
 
 
 from salary_calc import normalize_row

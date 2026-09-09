@@ -610,30 +610,60 @@ if(els.parseBtn) els.parseBtn.addEventListener('click', async () => {
 });
 
 function renderSheetRows() {
-  const loc = els.uploadLocation.value;
-  const whs = WAREHOUSES[loc] || [];
+  const loc = els.uploadLocation ? els.uploadLocation.value : '';
+  
   els.sheetsBody.innerHTML = pendingSheets.map((s, idx) => {
-    const selected = s.warehouse || (whs.includes(s.guess) ? s.guess : '');
-    const opts = ['<option value="">-- skip --</option>']
-      .concat(whs.map(w =>
-        `<option value="${escapeAttr(w)}"${w === selected ? ' selected' : ''}>${escapeHtml(w)}</option>`))
-      .join('');
+    // If a guess exists and no warehouse has been manually picked yet, use guess
+    if (!s.warehouse && s.guess) {
+      s.warehouse = s.guess;
+    }
+    const selected = s.warehouse || '';
+
+    let opts = '<option value="">-- skip --</option>';
+    if (loc && WAREHOUSES[loc]) {
+      opts += WAREHOUSES[loc].map(w =>
+        `<option value="${escapeAttr(w)}"${w === selected ? ' selected' : ''}>${escapeHtml(w)}</option>`
+      ).join('');
+    } else {
+      // Show all warehouses grouped by location
+      Object.entries(WAREHOUSES).forEach(([l, whList]) => {
+        opts += `<optgroup label="${escapeAttr(l)}">` +
+          whList.map(w => `<option value="${escapeAttr(w)}"${w === selected ? ' selected' : ''}>${escapeHtml(w)} (${escapeHtml(l)})</option>`).join('') +
+          `</optgroup>`;
+      });
+    }
+
     return `<tr>
-      <td>${escapeHtml(s.sheet_name)}</td><td>${s.rows}</td>
-      <td><select data-sheet-index="${idx}" style="min-width:160px;" onchange="window.__saveSheetWarehouse && window.__saveSheetWarehouse(${idx}, this.value)">${opts}</select></td>
+      <td style="font-weight:600;">${escapeHtml(s.sheet_name)}</td>
+      <td><span style="background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:4px; font-weight:500; font-size:12px;">${s.rows} rows</span></td>
+      <td>
+        <select data-sheet-index="${idx}" style="min-width:200px;" onchange="window.__saveSheetWarehouse && window.__saveSheetWarehouse(${idx}, this.value)">
+          ${opts}
+        </select>
+      </td>
     </tr>`;
   }).join('');
 }
+
 if(els.uploadLocation) els.uploadLocation.addEventListener('change', () => {
-  pendingSheets = pendingSheets.map(s => ({ ...s, warehouse: '' }));
   renderSheetRows();
 });
 
 window.__saveSheetWarehouse = (idx, value) => {
   if (pendingSheets[idx]) {
     pendingSheets[idx].warehouse = value;
+    // Auto-select location in uploadLocation if it's empty
+    if (value && els.uploadLocation && !els.uploadLocation.value) {
+      for (const [l, whList] of Object.entries(WAREHOUSES)) {
+        if (whList.includes(value)) {
+          els.uploadLocation.value = l;
+          break;
+        }
+      }
+    }
   }
 };
+
 
 if(els.confirmBtn) els.confirmBtn.addEventListener('click', async () => {
   if (!pendingToken) return;

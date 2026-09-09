@@ -373,8 +373,14 @@ def upload_confirm(payload: dict = Body(...)):
         summary = []
         for sheet_name, d in parsed.items():
             warehouse = mapping.get(sheet_name) or None
+            sheet_loc = location
+            if not sheet_loc and warehouse:
+                for loc_name, wh_list in LOCATIONS.items():
+                    if warehouse in wh_list:
+                        sheet_loc = loc_name
+                        break
             result = load_sheet_into_collection(
-                sheet_name, d, db, location=location,
+                sheet_name, d, db, location=sheet_loc,
                 warehouse=warehouse, source_file=pending["filename"],
             )
             if result["rows"]:
@@ -382,7 +388,9 @@ def upload_confirm(payload: dict = Body(...)):
     finally:
         os.remove(pending["path"])
 
+    broadcaster.broadcast("reload")
     return {"loaded": summary}
+
 
 
 @app.get("/collections")
