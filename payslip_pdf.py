@@ -78,9 +78,10 @@ def generate_payslip_pdf(payroll_record: dict, db=None) -> bytes:
         'earned_spl': float(flat_record.get('EARNING - Spl Allows', flat_record.get('EARNING - Special Allowance', 0))),
         'earned_leave': float(flat_record.get('EARNING - Leave With wages', 0)),
         'earned_bonus': float(flat_record.get('EARNING - Bonus @8.33%', 0)),
-        'earned_hra': float(flat_record.get('EARNING - HRA', 0)),
-        'earned_ot': float(flat_record.get('EARNING - OT Amount', flat_record.get('EARNING - OT', flat_record.get('OT', 0)))),
-        'ot_hours': float(flat_record.get('ATTENDANCE - OT Hours', flat_record.get('OT Hours', 0))),
+        'earned_ot': float(flat_record.get('OT', flat_record.get('EARNING - OT Amount', flat_record.get('EARNING - OT', flat_record.get('ot', 0))))),
+        'ot': float(flat_record.get('OT', flat_record.get('EARNING - OT Amount', flat_record.get('EARNING - OT', flat_record.get('ot', 0))))),
+        'incentive': float(flat_record.get('Incentive', flat_record.get('INCENTIVE', flat_record.get('incentive', 0)))),
+        'ot_hours': float(flat_record.get('ATTENDANCE - OT Hours', flat_record.get('OT Hours', flat_record.get('ot_hours', 0)))),
         
         # Deductions
         'pf': float(flat_record.get('Deductions - PF 12%', 0)),

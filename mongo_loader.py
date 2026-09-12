@@ -28,9 +28,16 @@ def guess_warehouse(sheet_name, warehouse_list):
         "NELMANGALA": "abb(nelamangla)",
         "SHAWFLOOR": "Shaw Floor",
         "SHAW": "Shaw Floor",
+        "UNICHARMBELLARY": "unicharm bellary",
+        "BELLARY": "unicharm bellary",
         "UNICHARM": "Unicharm",
         "HAVELLS": "Havells",
+        "SONYFG": "Sony-FG",
+        "SONYSPARES": "Sony-spares",
+        "SONYTPT": "sony-tpt",
         "SONY": "Sony",
+        "SCHNEIDER": "schneider",
+        "FLY": "fly",
         "BAJAJ": "Bajaj",
         "BOSCH": "Bosch",
         "HAIER": "Haier",
@@ -52,12 +59,16 @@ def guess_warehouse(sheet_name, warehouse_list):
 
 from salary_calc import normalize_row, recalculate
 
-def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, source_file):
+def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, source_file, month=None, year=None):
     """Load ONE already-parsed sheet into its own collection (cleared first)."""
     columns, rows = drop_empty_columns(sheet_data["columns"], sheet_data["rows"])
     coll_name = slugify(sheet_name)
     coll = db[coll_name]
     coll.delete_many({})
+    
+    upload_month = int(month) if month else datetime.utcnow().month
+    upload_year = int(year) if year else datetime.utcnow().year
+
     docs = []
     for i, row in enumerate(rows, start=1):
         doc = normalize_row(dict(row))
@@ -67,8 +78,8 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
         doc["_sheet"] = sheet_name
         doc["_location"] = location
         doc["_warehouse"] = warehouse or None
-        doc["_upload_month"] = datetime.utcnow().month
-        doc["_upload_year"] = datetime.utcnow().year
+        doc["_upload_month"] = upload_month
+        doc["_upload_year"] = upload_year
         docs.append(doc)
     if docs:
         coll.insert_many(docs)
@@ -80,8 +91,8 @@ def load_sheet_into_collection(sheet_name, sheet_data, db, location, warehouse, 
         location=location,
         warehouse=warehouse or "",
         source_file=source_file,
-        month=datetime.utcnow().month,
-        year=datetime.utcnow().year,
+        month=upload_month,
+        year=upload_year,
         db=db,
     )
 

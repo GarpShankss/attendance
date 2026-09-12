@@ -394,7 +394,22 @@
     <span class="status" id="uploadStatus" style="font-size:13px; color:var(--text-muted); margin-top:8px; display:inline-block;"></span>
     
     <div id="assignPanel" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
-      <h4 style="margin:0 0 12px 0; color:var(--text);">Assign Sheets</h4>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px; background:#f8fafc; padding:12px 16px; border-radius:8px; border:1px solid var(--border);">
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div class="filter-group" style="margin-bottom:0;">
+            <label style="font-weight:600; color:var(--text); font-size:13px;">Salary Sheet Month *</label>
+            <select id="uploadMonth" style="min-width: 150px; font-weight:600;"></select>
+          </div>
+          <div class="filter-group" style="margin-bottom:0;">
+            <label style="font-weight:600; color:var(--text); font-size:13px;">Year *</label>
+            <select id="uploadYear" style="min-width: 100px; font-weight:600;"></select>
+          </div>
+        </div>
+        <div style="color:var(--text-muted); font-size:13px;">
+          📅 Select the cycle/month to start this salary sheet
+        </div>
+      </div>
+      <h4 style="margin:0 0 12px 0; color:var(--text);">Assign Sheets to Warehouses</h4>
       <div class="table-wrap" style="max-height: 40vh;">
         <table>
           <thead><tr><th>Sheet Name</th><th>Rows Found</th><th>Assign Warehouse</th></tr></thead>
@@ -492,6 +507,8 @@ const els = {
   parseBtn:        document.getElementById('parseBtn'),
   assignPanel:     document.getElementById('assignPanel'),
   uploadLocation:  document.getElementById('uploadLocation'),
+  uploadMonth:     document.getElementById('uploadMonth'),
+  uploadYear:      document.getElementById('uploadYear'),
   sheetsBody:      document.getElementById('sheetsBody'),
   confirmBtn:      document.getElementById('confirmBtn'),
   uploadStatus:    document.getElementById('uploadStatus'),
@@ -537,19 +554,36 @@ function escapeHtml(v) {
 }
 const escapeAttr = escapeHtml;
 
+function initUploadMonthYear() {
+  const now = new Date();
+  if (els.uploadMonth) {
+    els.uploadMonth.innerHTML = MONTH_NAMES.slice(1).map((m, i) =>
+      `<option value="${i + 1}">${m}</option>`
+    ).join('');
+    els.uploadMonth.value = now.getMonth() + 1;
+  }
+  if (els.uploadYear) {
+    const currentY = now.getFullYear();
+    const years = [currentY - 1, currentY, currentY + 1, currentY + 2];
+    els.uploadYear.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+    els.uploadYear.value = currentY;
+  }
+}
+
 // ---- Boot ----
 async function loadWarehouses() {
   try {
+    initUploadMonthYear();
     const res = await fetch('/warehouses');
     WAREHOUSES = await res.json();
     const locations = Object.keys(WAREHOUSES);
     if(els.uploadLocation) els.uploadLocation.innerHTML = '<option value="">All locations</option>' + locations.map(l =>
       `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
-    if(els.filterLocation) els.filterLocation.innerHTML = '<option value="">All locations (Loaded!)</option>' +
+    if(els.filterLocation) els.filterLocation.innerHTML = '<option value="">All locations</option>' +
       locations.map(l => `<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
     populateFilterWarehouse();
   } catch(e) {
-    alert('Error in loadWarehouses: ' + e.message + '\n' + e.stack);
+    console.error('Error in loadWarehouses:', e);
   }
 }
 
@@ -597,6 +631,7 @@ if(els.parseBtn) els.parseBtn.addEventListener('click', async () => {
   const file = els.fileInput.files[0];
   if (!file) { els.uploadStatus.textContent = 'Choose a file first'; return; }
   els.uploadStatus.textContent = 'Parsing...';
+  showLoader('Parsing spreadsheet...');
   const fd = new FormData();
   fd.append('file', file);
   try {
@@ -605,11 +640,17 @@ if(els.parseBtn) els.parseBtn.addEventListener('click', async () => {
     const data = await res.json();
     pendingToken = data.token;
     pendingSheets = data.sheets.map(s => ({ ...s, warehouse: '' }));
+    
+    if (data.detected_month && els.uploadMonth) els.uploadMonth.value = data.detected_month;
+    if (data.detected_year && els.uploadYear) els.uploadYear.value = data.detected_year;
+
     renderSheetRows();
     els.assignPanel.style.display = 'block';
-    els.uploadStatus.textContent = `Found ${pendingSheets.length} sheet(s) — assign warehouse below`;
-  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
+    els.uploadStatus.textContent = `Found ${pendingSheets.length} sheet(s) — select salary month & assign warehouses below`;
+  } catch (err) {
     els.uploadStatus.textContent = 'Parse failed: ' + err.message;
+  } finally {
+    hideLoader();
   }
 });
 
@@ -680,22 +721,42 @@ if(els.confirmBtn) els.confirmBtn.addEventListener('click', async () => {
       sheet.warehouse = sel.value;
     }
   });
-  els.uploadStatus.textContent = 'Loading into MongoDB...';
+  
+  const targetMonth = els.uploadMonth ? Number(els.uploadMonth.value) : (new Date().getMonth() + 1);
+  const targetYear = els.uploadYear ? Number(els.uploadYear.value) : new Date().getFullYear();
+
+  els.uploadStatus.textContent = 'Loading into database...';
+  showLoader('Loading into Database...');
   try {
     const res = await fetch('/upload/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: pendingToken, location: els.uploadLocation.value, mapping }),
+      body: JSON.stringify({
+        token: pendingToken,
+        location: els.uploadLocation ? els.uploadLocation.value : '',
+        month: targetMonth,
+        year: targetYear,
+        mapping
+      }),
     });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
-    els.uploadStatus.textContent = `Loaded ${data.loaded.length} sheet(s) into MongoDB \u2713`;
+    els.uploadStatus.textContent = `Loaded ${data.loaded.length} sheet(s) into database for ${MONTH_NAMES[targetMonth]} ${targetYear} ✓`;
     els.assignPanel.style.display = 'none';
     pendingToken = null;
     els.fileInput.value = '';
-    loadMonthYearOptions();
-  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
+    await loadMonthYearOptions();
+    if (els.filterMonth) els.filterMonth.value = targetMonth;
+    if (els.filterYear) els.filterYear.value = targetYear;
+    if (els.uploadLocation && els.uploadLocation.value && els.filterLocation) {
+      els.filterLocation.value = els.uploadLocation.value;
+      populateFilterWarehouse();
+    }
+    loadData();
+  } catch (err) {
     els.uploadStatus.textContent = 'Load failed: ' + err.message;
+  } finally {
+    hideLoader();
   }
 });
 
@@ -721,7 +782,7 @@ if (document.getElementById('downloadPayrollBtn')) document.getElementById('down
 
 
 const NON_EDITABLE_COLUMNS = new Set([
-  'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
+  'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days',
   'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - Total',
   'Net Pay'
 ]);
@@ -750,7 +811,7 @@ async function loadData() {
       els.dataStatus.textContent =
         `${data.rows.length} row(s) across ${data.collections.length} sheet(s)`;
     }
-  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
+  } catch (err) {
     els.dataStatus.textContent = 'Load failed: ' + err.message;
   }
 }
@@ -785,10 +846,12 @@ async function generatePayroll() {
     els.generatePayrollStatus.textContent =
       `Payroll generated: created ${data.created}, skipped ${data.skipped}`;
     loadMonthYearOptions();
-    loadData(); hideLoader();
-  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
+    loadData();
+  } catch (err) {
     els.generatePayrollStatus.style.color = 'red';
     els.generatePayrollStatus.textContent = 'Generate failed: ' + err.message;
+  } finally {
+    hideLoader();
   }
 }
 
@@ -835,8 +898,10 @@ function renderDataTable(columns, rows) {
   const COLUMN_GROUPS = [
     { name: "Employee Details", cols: ["emp_id", "Sl.No", "Employee Name", "NAME", "location", "warehouse", "Unit Name", "Designation", "Department", "Active Status", "DOJ", "ACCOUNT", "Bank Name", "IFSC", "IFSC CODE", "UAN", "NAME - UAN", "ESIC", "PAN", "Email", "Mobile Number", "NAME - CONTACT"] },
     { name: "Fixed", cols: ["FIXED - Working Days", "FIXED - Basic", "FIXED - DA", "FIXED - BASIC & DA", "FIXED - Other Allows", "FIXED - OTHER ALLOWANCE", "FIXED - Spl Allows", "FIXED - SPECIAL ALLOW", "FIXED - Leave With wages", "FIXED - Bonus @8.33%", "FIXED - HRA", "FIXED - Total"] },
-    { name: "Attendance", cols: ["ATTENDANCE - Present Days", "ATTENDANCE - Holi day", "ATTENDANCE - Pay Days", "ATTENDANCE - OT Hours"] },
-    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - BASIC & DA", "EARNED - BASIC & DA", "EARNING - Other Allows", "EARNED - Other Allows", "EARNING - OTHER ALLOWANCE", "EARNED - OTHER ALLOWANCE", "EARNING - Spl Allows", "EARNED - Spl Allows", "EARNING - SPECIAL ALLOW", "EARNED - SPECIAL ALLOW", "EARNING - Leave With wages", "EARNED - Leave With wages", "EARNING - Bonus @8.33%", "EARNED - Bonus @8.33%", "EARNING - HRA", "EARNED - HRA", "EARNING - OT Amount", "EARNING - OT", "OT", "EARNING - Total", "EARNED - TOTAL"] },
+    { name: "Attendance", cols: ["ATTENDANCE - Present Days", "ATTENDANCE - Holi day", "ATTENDANCE - Pay Days", "ATTENDANCE - OT Hours", "OT Hours", "OT HOURS"] },
+    { name: "Earned", cols: ["EARNING - Basic", "EARNING - DA", "EARNING - BASIC & DA", "EARNED - BASIC & DA", "EARNING - Other Allows", "EARNED - Other Allows", "EARNING - OTHER ALLOWANCE", "EARNED - OTHER ALLOWANCE", "EARNING - Spl Allows", "EARNED - Spl Allows", "EARNING - SPECIAL ALLOW", "EARNED - SPECIAL ALLOW", "EARNING - Leave With wages", "EARNED - Leave With wages", "EARNING - Bonus @8.33%", "EARNED - Bonus @8.33%", "EARNING - HRA", "EARNED - HRA", "EARNING - Total", "EARNED - TOTAL"] },
+    { name: "OT", cols: ["OT", "OT Amount", "EARNING - OT Amount", "EARNING - OT", "EARNED - OT", "EARNED - OT Amount", "Overtime", "Over Time"] },
+    { name: "Incentive", cols: ["Incentive", "INCENTIVE", "Incentives", "INCENTIVES", "Incentive Amount", "INCENTIVE AMOUNT", "EARNING - Incentive", "EARNED - Incentive"] },
     { name: "Deductions", cols: ["Deductions - PF 12%", "DEDUCTION - PF 12%", "Deductions - ESIC 0.75%", "DEDUCTION - ESI 0.75%", "Deductions - PT", "DEDUCTION - PT", "Deductions - Adv", "DEDUCTION - ADV", "Deductions - Total Deduction", "DEDUCTION - TOTAL"] },
     { name: "Employer Contribution", cols: ["CONTRIBUTION - EPF @ 13%", "EMPLOYER CONTRIBUTION - PF 13%", "CONTRIBUTION - ESIC @ 3.25%", "EMPLOYER CONTRIBUTION - ESI 3.25%", "CONTRIBUTION - Total Employer Contribution", "EMPLOYER CONTRIBUTION - TOTAL", "CONTRIBUTION - LWW", "EMPLOYER CONTRIBUTION - LWW", "CONTRIBUTION - STATUTORY BONUS", "EMPLOYER CONTRIBUTION - STATU BONUS"] },
     { name: "CTC", cols: ["CONTRIBUTION - CTC", "CTC", "CONTRIBUTION - Service Charge", "SERVICE CHARGE", "CONTRIBUTION - Uniform Charges", "CONTRIBUTION - T Shirt", "CONTRIBUTION - Shoes", "SHOE CHARGES", "CONTRIBUTION - Total CTC", "TOTAL CTC"] },
@@ -863,7 +928,8 @@ function renderDataTable(columns, rows) {
                        .replace("DEDUCTION - ", "")
                        .replace("CONTRIBUTION - ", "")
                        .replace("EMPLOYER CONTRIBUTION - ", "");
-      if (shortName === 'OT Amount' || shortName === 'OT AMOUNT') shortName = 'OT';
+      if (shortName === 'OT Amount' || shortName === 'OT AMOUNT' || shortName === 'EARNING - OT Amount' || shortName === 'EARNED - OT Amount') shortName = 'OT';
+      if (shortName === 'Incentive Amount' || shortName === 'INCENTIVE AMOUNT' || shortName === 'EARNING - Incentive' || shortName === 'EARNED - Incentive') shortName = 'Incentive';
       if (shortName === 'OTHER ALLOWANCE') shortName = 'Other Allows';
       if (shortName === 'SPECIAL ALLOW') shortName = 'Spl Allows';
       if (shortName === 'STATUTORY BONUS' || shortName === 'STATU BONUS') shortName = 'STATU BONUS';

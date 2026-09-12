@@ -13,6 +13,9 @@ from payroll_settings import get_config
 # ---------------------------------------------------------------------------
 # Explicit column map  –  logical name  ->  exact Excel column header
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Explicit column map  –  logical name  ->  exact Excel column header
+# ---------------------------------------------------------------------------
 COLUMN_MAP = {
     # Fixed salary inputs
     "fixed_basic":            "FIXED - Basic",
@@ -41,8 +44,11 @@ COLUMN_MAP = {
     "earned_leave":           "EARNING - Leave With wages",
     "earned_bonus":           "EARNING - Bonus @8.33%",
     "earned_hra":             "EARNING - HRA",
-    "earned_ot":              "EARNING - OT Amount",
     "earned_total":           "EARNING - Total",
+
+    # Standalone Additional Inputs / Columns (added to Net Pay)
+    "ot":                     "OT",
+    "incentive":              "Incentive",
 
     # Employer / Contribution (calculated, written back)
     "emp_esi":                "CONTRIBUTION - ESIC @ 3.25%",
@@ -93,6 +99,7 @@ ALIASES = {
     "working_days": ["Basic Days", "Working Days", "FIXED - Working Days", "Work Days", "Fixed Days"],
     "present_days": ["Actual Days", "Present Days", "ATTENDANCE - Present Days"],
     "pay_days":     ["Actual Days", "Pay Days", "ATTENDANCE - Pay Days", "Paid Days"],
+    "ot_hours":     ["ATTENDANCE - OT Hours", "OT Hours", "OT HOURS", "OT Hours.", "Overtime Hours", "OT Hrs", "ot_hours", "ot hours"],
     "fixed_basic":  ["BASIC", "Basic", "Fixed Basic", "FIXED - Basic", "BASIC & DA", "Basic & DA", "FIXED - BASIC & DA", "FIXED - Basic & DA"],
     "fixed_da":     ["DA", "D.A", "Fixed DA", "FIXED - DA", "D.A."],
     "fixed_hra":    ["HRA", "H.R.A", "Fixed HRA", "FIXED - HRA", "H.R.A."],
@@ -107,7 +114,8 @@ ALIASES = {
     "earned_spl":   ["EARNING - Spl Allows", "EARNED - Spl Allows", "Earned Special Allowance", "EARNING - Special Allowance", "EARNED - Special Allowance", "Earned Spl Allows", "EARNING - SPECIAL ALLOW", "EARNED - SPECIAL ALLOW", "EARNING - Special Allow", "EARNED - Special Allow", "Earned Special Allow"],
     "earned_leave": ["EARNING - Leave With wages", "EARNED - Leave With wages", "Earned Leave With Wages", "EARNING - LWW", "EARNED - LWW", "Earned LWW"],
     "earned_bonus": ["EARNING - Bonus @8.33%", "EARNED - Bonus @8.33%", "EARNING - STATU BONUS", "EARNED - STATU BONUS", "EARNING - STATUTORY BONUS", "EARNED - STATUTORY BONUS", "Earned Bonus"],
-    "earned_ot":    ["OT", "O.T", "O.T.", "OT Amount", "OT AMOUNT", "Earned OT", "EARNING - OT", "EARNING - OT Amount", "EARNING - OT AMOUNT", "EARNED - OT", "EARNED - OT Amount", "EARNED - OT AMOUNT", "Overtime", "Over Time", "Overtime Amount", "OT Pay", "EARNING - Overtime", "ot"],
+    "ot":           ["OT", "O.T", "O.T.", "OT Amount", "OT AMOUNT", "Earned OT", "EARNING - OT", "EARNING - OT Amount", "EARNING - OT AMOUNT", "EARNED - OT", "EARNED - OT Amount", "EARNED - OT AMOUNT", "Overtime", "Over Time", "Overtime Amount", "OT Pay", "EARNING - Overtime", "ot"],
+    "incentive":    ["Incentive", "INCENTIVE", "Incentives", "INCENTIVES", "Incentive Amount", "INCENTIVE AMOUNT", "EARNING - Incentive", "EARNED - Incentive", "incentive"],
     "earned_total": ["EARNING - Total", "EARNED - Total", "EARNING - TOTAL", "EARNED - TOTAL", "Earned Total", "EARNING - Gross", "EARNED - Gross"],
     "fixed_total":  ["Total", "Gross", "Total Fixed", "FIXED - Total", "FIXED - TOTAL", "Fixed Total"],
     "fixed_shoes":  ["SEFTY SHOES", "Safety Shoes", "CONTRIBUTION - Shoes", "Shoes", "SHOE CHARGES", "Shoe Charges"],
@@ -263,8 +271,10 @@ def put(row: dict, field: str, value):
                 row[k] = value
                 return
 
-    # For earned_ot / earned_spl: if value is 0/empty/None and no such column was present, DO NOT create a column!
-    if field in ("earned_ot", "earned_spl") and (not value or value == 0):
+    # For ot / incentive / earned_spl / earned_ot: if value is 0/empty/None and no such column was present, DO NOT create a column!
+    if field in ("ot", "incentive", "earned_spl", "earned_ot") and (not value or value == 0):
+        return
+    if field in ("ot", "incentive") and not any(k in row for k in ([col] + ALIASES.get(field, []))):
         return
 
     # create missing output field if it was not already present
@@ -331,6 +341,11 @@ def recalculate(row: dict) -> dict:
         if col and col in r and isinstance(r[col], (int, float)):
             r[col] = fval
 
+    # Optional standalone inputs
+    ot_hours  = get(r, "ot_hours")
+    ot        = R(get(r, "ot"))
+    incentive = R(get(r, "incentive"))
+
     L("=" * 60)
     L("SALARY CALCULATION LOG")
     L("=" * 60)
@@ -338,6 +353,7 @@ def recalculate(row: dict) -> dict:
     L("── INPUTS ──────────────────────────────────────────────────")
     L(f"  Working Days          (FIXED - Working Days)      = {working_days}")
     L(f"  Pay Days              (ATTENDANCE - Pay Days)     = {pay_days}")
+    L(f"  OT Hours              (ATTENDANCE - OT Hours)     = {ot_hours}")
     L(f"  Fixed Basic           (FIXED - Basic)             = {fixed_basic}")
     L(f"  Fixed DA              (FIXED - DA)                = {fixed_da}")
     L(f"  Fixed Other Allows    (FIXED - Other Allows)      = {fixed_other}")
@@ -345,6 +361,8 @@ def recalculate(row: dict) -> dict:
     L(f"  Fixed Leave W/Wages   (FIXED - Leave With wages)  = {fixed_leave}")
     L(f"  Fixed Bonus           (FIXED - Bonus @8.33%)      = {fixed_bonus}")
     L(f"  Fixed HRA             (FIXED - HRA)               = {fixed_hra}")
+    L(f"  OT                    (OT)                        = {ot}")
+    L(f"  Incentive             (Incentive)                 = {incentive}")
     L(f"  Fixed Service Charge  (CONTRIBUTION - SC)         = {fixed_sc}")
     L(f"  Uniform               (CONTRIBUTION - Uniform)    = {uniform}")
     L(f"  T Shirt               (CONTRIBUTION - T Shirt)     = {fixed_tshirt}")
@@ -392,16 +410,13 @@ def recalculate(row: dict) -> dict:
     earned_hra = R(fixed_hra / working_days * pay_days)
     L(f"  Earned HRA    = ROUND({fixed_hra} / {working_days} × {pay_days}, 0)"
       f"  = ROUND({fixed_hra / working_days * pay_days:.4f}, 0)  = {earned_hra}")
-      
-    earned_ot = R(get(r, "earned_ot"))
-    L(f"  Earned OT Amount = {earned_ot}")
     L("")
 
-    # ── Total Earnings ───────────────────────────────────────────────────────
-    total_earnings = R(earned_basic + earned_da + earned_other + earned_spl + earned_leave + earned_bonus + earned_hra + earned_ot)
+    # ── Total Earnings (Sum of earned components) ────────────────────────────
+    total_earnings = R(earned_basic + earned_da + earned_other + earned_spl + earned_leave + earned_bonus + earned_hra)
     L("── TOTAL EARNINGS  [ROUND(sum of earned components, 0)] ────")
-    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_spl} + {earned_leave} + {earned_bonus} + {earned_hra} + {earned_ot}, 0)")
-    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_spl + earned_leave + earned_bonus + earned_hra + earned_ot}, 0)")
+    L(f"  = ROUND({earned_basic} + {earned_da} + {earned_other} + {earned_spl} + {earned_leave} + {earned_bonus} + {earned_hra}, 0)")
+    L(f"  = ROUND({earned_basic + earned_da + earned_other + earned_spl + earned_leave + earned_bonus + earned_hra}, 0)")
     L(f"  = {total_earnings}")
     L("")
 
@@ -467,10 +482,10 @@ def recalculate(row: dict) -> dict:
     L(f"  = ROUND({pf} + {esi} + {pt} + {advance}, 0)  = {total_deduction}")
     L("")
 
-    # ── Net Pay ──────────────────────────────────────────────────────────────
-    net_pay = R(total_earnings - total_deduction)
-    L("── NET PAY  [ROUND(Total Earnings - Total Deduction, 0)] ──")
-    L(f"  = ROUND({total_earnings} - {total_deduction}, 0)  = {net_pay}")
+    # ── Net Pay (Total Earnings - Total Deduction + OT + Incentive) ───────────
+    net_pay = R(total_earnings - total_deduction + ot + incentive)
+    L("── NET PAY  [ROUND(Total Earnings - Total Deduction + OT + Incentive, 0)] ──")
+    L(f"  = ROUND({total_earnings} - {total_deduction} + {ot} + {incentive}, 0)  = {net_pay}")
     L("")
 
     # ── Employer PF ──────────────────────────────────────────────────────────
@@ -524,7 +539,8 @@ def recalculate(row: dict) -> dict:
     L(f"  Earned Leave W/Wages  = {earned_leave}")
     L(f"  Earned Bonus          = {earned_bonus}")
     L(f"  Earned HRA            = {earned_hra}")
-    L(f"  Earned OT Amount      = {earned_ot}")
+    L(f"  OT                    = {ot}")
+    L(f"  Incentive             = {incentive}")
     L(f"  Total Earnings        = {total_earnings}")
     L(f"  PF                    = {pf}")
     L(f"  ESI                   = {esi}")
@@ -550,8 +566,11 @@ def recalculate(row: dict) -> dict:
     put(r, "earned_leave",    earned_leave)
     put(r, "earned_bonus",    earned_bonus)
     put(r, "earned_hra",      earned_hra)
-    put(r, "earned_ot",       earned_ot)
     put(r, "earned_total",    total_earnings)
+    if "OT" in r or any(a in r for a in ALIASES.get("ot", [])) or ot > 0:
+        put(r, "ot", ot)
+    if "Incentive" in r or any(a in r for a in ALIASES.get("incentive", [])) or incentive > 0:
+        put(r, "incentive", incentive)
     put(r, "pf",              pf)
     put(r, "esi",             esi)
     put(r, "pt",              pt)
@@ -619,7 +638,7 @@ if __name__ == "__main__":
         "CONTRIBUTION - Total CTC":      26273,
     }
 
-    print("=== Salary Calc Self-Test (ABB) ===")
+    print("=== Salary Calc Self-Test (ABB Baseline) ===")
     all_ok = True
     for col, expected in checks.items():
         got = result.get(col)
@@ -628,17 +647,54 @@ if __name__ == "__main__":
         if got != expected:
             all_ok = False
 
-    # Test with OT column
+    # Test with standalone OT column
     test_row_ot = dict(test_row)
     test_row_ot["OT"] = 1500
     result_ot = recalculate(test_row_ot)
     print("\n=== Salary Calc Self-Test (With OT 1500) ===")
     ot_checks = {
-        "EARNING - Total": 23603 + 1500,
-        "Net Pay": 25103 - 1680 - 200,  # Crosses 25k threshold, so PT=200 applies
+        "EARNING - Total": 23603,
+        "OT": 1500,
+        "Net Pay": 21923 + 1500,  # 23423
     }
     for col, expected in ot_checks.items():
         got = result_ot.get(col)
+        status = "OK" if got == expected else f"FAIL (got {got}, expected {expected})"
+        print(f"  {col}: {status}")
+        if got != expected:
+            all_ok = False
+
+    # Test with standalone Incentive column
+    test_row_inc = dict(test_row)
+    test_row_inc["Incentive"] = 1000
+    result_inc = recalculate(test_row_inc)
+    print("\n=== Salary Calc Self-Test (With Incentive 1000) ===")
+    inc_checks = {
+        "EARNING - Total": 23603,
+        "Incentive": 1000,
+        "Net Pay": 21923 + 1000,  # 22923
+    }
+    for col, expected in inc_checks.items():
+        got = result_inc.get(col)
+        status = "OK" if got == expected else f"FAIL (got {got}, expected {expected})"
+        print(f"  {col}: {status}")
+        if got != expected:
+            all_ok = False
+
+    # Test with both OT and Incentive
+    test_row_both = dict(test_row)
+    test_row_both["OT"] = 1500
+    test_row_both["Incentive"] = 1000
+    result_both = recalculate(test_row_both)
+    print("\n=== Salary Calc Self-Test (With OT 1500 & Incentive 1000) ===")
+    both_checks = {
+        "EARNING - Total": 23603,
+        "OT": 1500,
+        "Incentive": 1000,
+        "Net Pay": 21923 + 1500 + 1000,  # 24423
+    }
+    for col, expected in both_checks.items():
+        got = result_both.get(col)
         status = "OK" if got == expected else f"FAIL (got {got}, expected {expected})"
         print(f"  {col}: {status}")
         if got != expected:

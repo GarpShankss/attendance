@@ -13,7 +13,7 @@ Run:
     uvicorn app:app --reload
 Then open http://localhost:8000
 """
-import os, shutil, tempfile, uuid
+import os, shutil, tempfile, uuid, re
 from datetime import datetime
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -330,6 +330,34 @@ def get_warehouses():
     return LOCATIONS
 
 
+MONTH_NAME_MAP = {
+    "january": 1, "jan": 1,
+    "february": 2, "feb": 2,
+    "march": 3, "mar": 3,
+    "april": 4, "apr": 4,
+    "may": 5,
+    "june": 6, "jun": 6,
+    "july": 7, "jul": 7,
+    "august": 8, "aug": 8,
+    "september": 9, "sep": 9, "sept": 9,
+    "october": 10, "oct": 10,
+    "november": 11, "nov": 11,
+    "december": 12, "dec": 12,
+}
+
+def detect_month_year(text):
+    text_clean = re.sub(r'[^a-zA-Z0-9]+', ' ', str(text)).lower()
+    tokens = text_clean.split()
+    found_month = None
+    found_year = None
+    for t in tokens:
+        if t in MONTH_NAME_MAP and not found_month:
+            found_month = MONTH_NAME_MAP[t]
+        elif t.isdigit() and len(t) == 4 and 2000 <= int(t) <= 2100 and not found_year:
+            found_year = int(t)
+    return found_month, found_year
+
+
 @app.post("/upload/preview")
 async def upload_preview(file: UploadFile = File(...)):
     suffix = os.path.splitext(file.filename)[1] or ".xlsx"
@@ -341,7 +369,15 @@ async def upload_preview(file: UploadFile = File(...)):
     parsed = parse_workbook(tmp_path)
     all_warehouses = sorted({wh for whs in LOCATIONS.values() for wh in whs})
     sheets = []
+    
+    det_m, det_y = detect_month_year(file.filename)
+    
     for sheet_name, d in parsed.items():
+        if not det_m or not det_y:
+            sm, sy = detect_month_year(sheet_name)
+            det_m = det_m or sm
+            det_y = det_y or sy
+
         columns, rows = drop_empty_columns(d["columns"], d["rows"])
         if not rows:
             continue
@@ -356,13 +392,20 @@ async def upload_preview(file: UploadFile = File(...)):
 
     token = uuid.uuid4().hex
     PENDING_UPLOADS[token] = {"path": tmp_path, "filename": file.filename}
-    return {"token": token, "sheets": sheets}
+    return {
+        "token": token,
+        "sheets": sheets,
+        "detected_month": det_m or datetime.utcnow().month,
+        "detected_year": det_y or datetime.utcnow().year,
+    }
 
 
 @app.post("/upload/confirm")
 def upload_confirm(payload: dict = Body(...)):
     token = payload.get("token")
     location = payload.get("location")
+    month = payload.get("month")
+    year = payload.get("year")
     mapping = payload.get("mapping", {})  # {sheet_name: warehouse_name_or_empty}
     pending = PENDING_UPLOADS.pop(token, None)
     if not pending:
@@ -382,6 +425,7 @@ def upload_confirm(payload: dict = Body(...)):
             result = load_sheet_into_collection(
                 sheet_name, d, db, location=sheet_loc,
                 warehouse=warehouse, source_file=pending["filename"],
+                month=month, year=year
             )
             if result["rows"]:
                 summary.append(result)
@@ -389,7 +433,7 @@ def upload_confirm(payload: dict = Body(...)):
         os.remove(pending["path"])
 
     broadcaster.broadcast("reload")
-    return {"loaded": summary}
+    return {"loaded": summary, "month": month, "year": year}
 
 
 
@@ -528,7 +572,13 @@ def _map_payroll_updates(name: str, to_write: dict, stored: dict = None):
         elif key == "Net Pay":
             mapped["net_pay"] = value
             mapped["Net Pay"] = value
-        elif key in ("ATTENDANCE - Present Days", "ATTENDANCE - Pay Days"):
+        elif key in ("OT", "ot", "OT Amount", "EARNING - OT Amount"):
+            mapped["OT"] = value
+            mapped["ot"] = value
+        elif key in ("Incentive", "incentive", "INCENTIVE", "Incentives"):
+            mapped["Incentive"] = value
+            mapped["incentive"] = value
+        elif key in ("ATTENDANCE - Present Days", "ATTENDANCE - Pay Days", "ATTENDANCE - OT Hours", "OT Hours", "ot_hours"):
             attendance_updates[key] = value
             mapped[key] = value
         elif key.startswith("CONTRIBUTION -"):
@@ -774,7 +824,7 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
 
     # Frontend read-only columns (Attendance + Calculated)
     FRONTEND_READONLY = {
-        'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days', 'ATTENDANCE - OT Hours',
+        'ATTENDANCE - Present Days', 'ATTENDANCE - Holi day', 'ATTENDANCE - Pay Days',
         'EARNING - Basic', 'EARNING - DA', 'EARNING - Other Allows', 'EARNING - Leave With wages', 
         'EARNING - Bonus @8.33%', 'EARNING - HRA', 'EARNING - Total',
         'Net Pay',
@@ -1012,6 +1062,17 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
 
     flat_docs = [_flatten_doc(d) for d in docs]
 
+    has_ot_hours = any(d.get("ATTENDANCE - OT Hours") is not None or d.get("OT Hours") is not None for d in flat_docs)
+    has_ot = any(d.get("OT") is not None or d.get("ot") is not None or d.get("OT Amount") is not None or d.get("EARNING - OT Amount") is not None for d in flat_docs)
+    has_incentive = any(d.get("Incentive") is not None or d.get("incentive") is not None or d.get("INCENTIVE") is not None for d in flat_docs)
+
+    att_cols = [
+        ("Present Days", "ATTENDANCE - Present Days"), ("Holi day", "ATTENDANCE - Holi day"), ("Pay Days", "ATTENDANCE - Pay Days")
+    ]
+    if has_ot_hours:
+        ot_h_key = "ATTENDANCE - OT Hours" if any(d.get("ATTENDANCE - OT Hours") is not None for d in flat_docs) else "OT Hours"
+        att_cols.append(("OT Hours", ot_h_key))
+
     COLUMN_GROUPS = [
         ("Employee Details", [
             ("Emp ID", "emp_id"), ("Employee Name", "Employee Name"), ("Location", "location"), ("Warehouse", "warehouse"),
@@ -1023,13 +1084,20 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
             ("Working Days", "FIXED - Working Days"), ("Basic", "FIXED - Basic"), ("DA", "FIXED - DA"), ("Other Allows", "FIXED - Other Allows"),
             ("Leave With wages", "FIXED - Leave With wages"), ("Bonus @8.33%", "FIXED - Bonus @8.33%"), ("HRA", "FIXED - HRA"), ("Total", "FIXED - Total")
         ]),
-        ("Attendance", [
-            ("Present Days", "ATTENDANCE - Present Days"), ("Holi day", "ATTENDANCE - Holi day"), ("Pay Days", "ATTENDANCE - Pay Days"), ("OT Hours", "ATTENDANCE - OT Hours")
-        ]),
+        ("Attendance", att_cols),
         ("Earned", [
             ("Basic", "EARNING - Basic"), ("DA", "EARNING - DA"), ("Other Allows", "EARNING - Other Allows"), ("Leave With wages", "EARNING - Leave With wages"),
-            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("HRA", "EARNING - HRA"), ("OT", "EARNING - OT Amount"), ("Total", "EARNING - Total")
+            ("Bonus @8.33%", "EARNING - Bonus @8.33%"), ("HRA", "EARNING - HRA"), ("Total", "EARNING - Total")
         ]),
+    ]
+    if has_ot:
+        ot_key = "OT" if any(d.get("OT") is not None for d in flat_docs) else ("ot" if any(d.get("ot") is not None for d in flat_docs) else "EARNING - OT Amount")
+        COLUMN_GROUPS.append(("OT", [("OT", ot_key)]))
+    if has_incentive:
+        inc_key = "Incentive" if any(d.get("Incentive") is not None for d in flat_docs) else ("incentive" if any(d.get("incentive") is not None for d in flat_docs) else "INCENTIVE")
+        COLUMN_GROUPS.append(("Incentive", [("Incentive", inc_key)]))
+
+    COLUMN_GROUPS.extend([
         ("Deductions", [
             ("PF 12%", "Deductions - PF 12%"), ("ESIC 0.75%", "Deductions - ESIC 0.75%"), ("PT", "Deductions - PT"), ("Adv", "Deductions - Adv"),
             ("Total Deduction", "Deductions - Total Deduction")
@@ -1044,7 +1112,7 @@ def download_payroll(month: int, year: int, location: str = None, warehouse: str
         ("Net Pay", [
             ("Net Pay", "Net Pay")
         ])
-    ]
+    ])
 
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     from openpyxl.utils import get_column_letter

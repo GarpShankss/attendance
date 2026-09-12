@@ -9,7 +9,8 @@ LOCATIONS = {
         "Idemitsu", "Daikin", "Mitsubishi", "Schneider",
     ],
     "Bangalore": [
-        "APL", "Havells", "Sony", "Unicharm", "Bajaj", "abb(nelamangla)", "abb(HANCHIPURA)",
+        "APL", "Havells", "Sony", "Sony-FG", "Sony-spares", "sony-tpt", "fly", "schneider", "unicharm bellary",
+        "Unicharm", "Bajaj", "abb(nelamangla)", "abb(HANCHIPURA)",
         "Bosch", "LG", "TPT", "Shaw Floor", "Haier",
     ],
 }
