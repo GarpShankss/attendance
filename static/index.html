@@ -380,33 +380,37 @@
   <!-- Upload Section -->
   <div class="card" id="uploadSection" style="display: none;">
     <h3>Upload Payroll File</h3>
-    <div class="filter-row">
+    <div class="filter-row" style="align-items: flex-end;">
       <div class="filter-group">
         <label>Location</label>
         <select id="uploadLocation"></select>
       </div>
-      <div class="filter-group" style="flex:2; max-width: 400px;">
+      <div class="filter-group" style="max-width: 160px;">
+        <label style="font-weight: 600; color: var(--primary);">Salary Month *</label>
+        <select id="uploadMonth" style="font-weight: 600; border-color: var(--primary);"></select>
+      </div>
+      <div class="filter-group" style="max-width: 110px;">
+        <label style="font-weight: 600; color: var(--primary);">Year *</label>
+        <select id="uploadYear" style="font-weight: 600; border-color: var(--primary);"></select>
+      </div>
+      <div class="filter-group" style="flex:2; max-width: 380px;">
         <label>File (.xlsx, .xls)</label>
         <input type="file" id="fileInput" accept=".xlsx,.xls">
       </div>
-      <button id="parseBtn" class="btn-primary" style="height: 38px;">Parse File</button>
+      <button id="parseBtn" class="btn-primary" style="height: 38px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        Parse File
+      </button>
     </div>
     <span class="status" id="uploadStatus" style="font-size:13px; color:var(--text-muted); margin-top:8px; display:inline-block;"></span>
     
     <div id="assignPanel" style="display:none; margin-top:20px; border-top:1px solid var(--border); padding-top:20px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px; background:#f8fafc; padding:12px 16px; border-radius:8px; border:1px solid var(--border);">
-        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-          <div class="filter-group" style="margin-bottom:0;">
-            <label style="font-weight:600; color:var(--text); font-size:13px;">Salary Sheet Month *</label>
-            <select id="uploadMonth" style="min-width: 150px; font-weight:600;"></select>
-          </div>
-          <div class="filter-group" style="margin-bottom:0;">
-            <label style="font-weight:600; color:var(--text); font-size:13px;">Year *</label>
-            <select id="uploadYear" style="min-width: 100px; font-weight:600;"></select>
-          </div>
-        </div>
-        <div style="color:var(--text-muted); font-size:13px;">
-          📅 Select the cycle/month to start this salary sheet
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:16px; background:#f0fdf4; padding:12px 18px; border-radius:8px; border:1px solid #bbf7d0;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <span style="font-size:18px;">📅</span>
+          <span style="font-size:14px; font-weight:600; color:#166534;">Target Salary Sheet Month:</span>
+          <span id="detectedBadge" style="background:#16a34a; color:white; font-size:13px; font-weight:700; padding:4px 12px; border-radius:16px; letter-spacing:0.3px;"></span>
+          <span style="font-size:13px; color:#15803d;">(You can adjust the Month or Year dropdown above if needed)</span>
         </div>
       </div>
       <h4 style="margin:0 0 12px 0; color:var(--text);">Assign Sheets to Warehouses</h4>
@@ -417,7 +421,9 @@
         </table>
       </div>
       <div style="margin-top:16px;">
-        <button id="confirmBtn" class="btn-success">Confirm &amp; Load into Database</button>
+        <button id="confirmBtn" class="btn-success" style="padding: 10px 22px; font-weight:600; font-size:14px;">
+          Confirm &amp; Load into Database
+        </button>
       </div>
     </div>
   </div>
@@ -453,6 +459,18 @@
       <button id="downloadPayrollBtn" class="btn-outline">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         Download Salary Sheet
+      </button>
+      <button id="btnEditAll" class="btn-outline" style="border-color: #6366f1; color: #6366f1; font-weight:600;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        Edit All
+      </button>
+      <button id="btnSaveAll" class="btn-success" style="display:none; font-weight:600;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        Save All
+      </button>
+      <button id="btnCancelAll" class="btn-outline" style="display:none; border-color: #ef4444; color: #ef4444;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        Cancel
       </button>
       <button id="btnGenerateAll" class="btn-primary" >Generate All Payslips</button>
       <button id="btnDownloadAll" class="btn-outline">Download All Payslips</button>
@@ -547,6 +565,7 @@ let currentColumns = [];
 let currentData = [];
 // track rows in edit mode: rowKey -> original td values
 let editingRows = {};
+let isBulkEditing = false;
 
 function escapeHtml(v) {
   return String(v != null ? v : '').replace(/[&<>"]/g, m =>
@@ -556,19 +575,37 @@ const escapeAttr = escapeHtml;
 
 function initUploadMonthYear() {
   const now = new Date();
-  if (els.uploadMonth) {
+  if (els.uploadMonth && els.uploadMonth.options.length === 0) {
     els.uploadMonth.innerHTML = MONTH_NAMES.slice(1).map((m, i) =>
       `<option value="${i + 1}">${m}</option>`
     ).join('');
     els.uploadMonth.value = now.getMonth() + 1;
+    els.uploadMonth.addEventListener('change', updateConfirmBtnText);
   }
-  if (els.uploadYear) {
+  if (els.uploadYear && els.uploadYear.options.length === 0) {
     const currentY = now.getFullYear();
     const years = [currentY - 1, currentY, currentY + 1, currentY + 2];
     els.uploadYear.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
     els.uploadYear.value = currentY;
+    els.uploadYear.addEventListener('change', updateConfirmBtnText);
+  }
+  updateConfirmBtnText();
+}
+
+function updateConfirmBtnText() {
+  if (!els.uploadMonth || !els.uploadYear) return;
+  const m = Number(els.uploadMonth.value) || (new Date().getMonth() + 1);
+  const y = Number(els.uploadYear.value) || new Date().getFullYear();
+  const mName = MONTH_NAMES[m] || '';
+  const badge = document.getElementById('detectedBadge');
+  if (badge) badge.textContent = `${mName} ${y}`;
+  if (els.confirmBtn) {
+    els.confirmBtn.textContent = `Confirm & Load into Database for ${mName} ${y} ✓`;
   }
 }
+
+// Initialize immediately so dropdowns are always populated
+initUploadMonthYear();
 
 // ---- Boot ----
 async function loadWarehouses() {
@@ -643,6 +680,7 @@ if(els.parseBtn) els.parseBtn.addEventListener('click', async () => {
     
     if (data.detected_month && els.uploadMonth) els.uploadMonth.value = data.detected_month;
     if (data.detected_year && els.uploadYear) els.uploadYear.value = data.detected_year;
+    updateConfirmBtnText();
 
     renderSheetRows();
     els.assignPanel.style.display = 'block';
@@ -795,6 +833,9 @@ async function loadData() {
   if (els.filterYear.value)      params.set('year',      els.filterYear.value);
   els.dataStatus.textContent = 'Loading...';
   try {
+    isBulkEditing = false;
+    editingRows = {};
+    if (typeof updateEditToolbarState === 'function') updateEditToolbarState();
     const res = await fetch('/data?' + params.toString());
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
@@ -892,7 +933,18 @@ async function updateDashboardStats(params, rows) {
 
 // ---- Render table ----
 function renderDataTable(columns, rows) {
-  editingRows = {};
+  if (!isBulkEditing) {
+    if (!rows || !rows.some(r => editingRows[`${r._collection}__${r._row_id}`])) {
+      editingRows = {};
+    }
+  } else {
+    if (rows && rows.length > 0) {
+      rows.forEach(r => {
+        const rk = `${r._collection}__${r._row_id}`;
+        if (!editingRows[rk]) editingRows[rk] = {};
+      });
+    }
+  }
   const monthYearSelected = Boolean(els.filterMonth.value && els.filterYear.value);
   
   const COLUMN_GROUPS = [
@@ -952,14 +1004,15 @@ function renderDataTable(columns, rows) {
 
   const body = '<tbody>' + rows.map((r, i) => {
     const rowKey = `${r._collection}__${r._row_id}`;
+    const isEditingThisRow = isBulkEditing || Boolean(editingRows[rowKey]);
     
     let actionButtons = '';
-    if (editingRows[rowKey]) {
-        actionButtons += `<button class="btn-icon save" title="Save" onclick="saveRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>`;
-        actionButtons += `<button class="btn-icon cancel" title="Cancel" onclick="cancelEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>`;
+    if (isEditingThisRow) {
+        actionButtons += `<button class="btn-icon save" title="Save this row" onclick="saveRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>`;
+        actionButtons += `<button class="btn-icon cancel" title="Cancel this row" onclick="cancelEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>`;
     } else {
         const editButton = monthYearSelected ?
-          `<button class="btn-icon edit" title="Edit" onclick="startEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` :
+          `<button class="btn-icon edit" title="Edit this row" onclick="startEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>` :
           `<button class="btn-icon edit" disabled title="Select Month and Year to edit"><svg width="16" height="16" opacity="0.3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>`;
         
         const deleteButton = `<button class="btn-icon delete" title="Delete" onclick="deleteEmployeeRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>`;
@@ -1006,7 +1059,7 @@ function renderDataTable(columns, rows) {
       if (c === 'emp_id') extraClass += ' sticky-col emp-id-col';
       if (c === 'Employee Name') extraClass += ' sticky-col emp-name-col';
       
-      if (editingRows[rowKey] && !NON_EDITABLE_COLUMNS.has(c) && c !== 'emp_id' && c !== 'Employee Name') {
+      if (isEditingThisRow && !NON_EDITABLE_COLUMNS.has(c) && c !== 'emp_id' && c !== 'Employee Name') {
           tr += `<td class="${extraClass.trim()}">
                    <input type="text" class="cell-input" data-col="${escapeAttr(c)}" value="${escapeHtml(displayVal)}" />
                  </td>`;
@@ -1042,21 +1095,142 @@ function renderDataTable(columns, rows) {
       document.getElementById('tableWrap').style.display = 'block';
   }
 }
+
+function updateEditToolbarState() {
+  const btnEditAll = document.getElementById('btnEditAll');
+  const btnSaveAll = document.getElementById('btnSaveAll');
+  const btnCancelAll = document.getElementById('btnCancelAll');
+
+  if (!btnEditAll || !btnSaveAll || !btnCancelAll) return;
+
+  if (isBulkEditing) {
+    btnEditAll.style.display = 'none';
+    btnSaveAll.style.display = 'inline-flex';
+    btnCancelAll.style.display = 'inline-flex';
+  } else {
+    btnEditAll.style.display = 'inline-flex';
+    btnSaveAll.style.display = 'none';
+    btnCancelAll.style.display = 'none';
+  }
+}
+
+function startBulkEdit() {
+  if (!currentData || currentData.length === 0) {
+    alert("No records to edit. Please click 'Show Data' first.");
+    return;
+  }
+  const monthYearSelected = Boolean(els.filterMonth && els.filterMonth.value && els.filterYear && els.filterYear.value);
+  if (!monthYearSelected) {
+    alert("Please select Month and Year before editing salary records.");
+    return;
+  }
+
+  isBulkEditing = true;
+  editingRows = {};
+  currentData.forEach(r => {
+    const rowKey = `${r._collection}__${r._row_id}`;
+    editingRows[rowKey] = {};
+  });
+
+  updateEditToolbarState();
+  renderDataTable(currentColumns, currentData);
+
+  els.dataStatus.style.color = '#4338ca';
+  els.dataStatus.textContent = `Editing all ${currentData.length} records. Modify any values and click "Save All" when done.`;
+}
+
+function cancelBulkEdit() {
+  isBulkEditing = false;
+  editingRows = {};
+  updateEditToolbarState();
+  renderDataTable(currentColumns, currentData);
+  els.dataStatus.textContent = '';
+  els.dataStatus.style.color = '';
+}
+
+async function saveBulkEdit() {
+  const trs = els.dataTable.querySelectorAll('tbody tr[data-row-key]');
+  if (!trs || trs.length === 0) {
+    cancelBulkEdit();
+    return;
+  }
+
+  const rowsToSave = [];
+  trs.forEach(tr => {
+    const collection = tr.dataset.collection || "payroll_records";
+    const rowId = tr.dataset.objId || tr.dataset.rowId;
+    const inputs = tr.querySelectorAll('input.cell-input[data-col]');
+    if (inputs.length > 0) {
+      const payload = {};
+      inputs.forEach(inp => {
+        payload[inp.dataset.col] = inp.value;
+      });
+      rowsToSave.push({
+        collection: collection,
+        row_id: rowId,
+        payload: payload
+      });
+    }
+  });
+
+  if (rowsToSave.length === 0) {
+    cancelBulkEdit();
+    return;
+  }
+
+  showLoader(`Saving and recalculating ${rowsToSave.length} records...`);
+  els.dataStatus.style.color = 'var(--text)';
+  els.dataStatus.textContent = `Saving and recalculating ${rowsToSave.length} records...`;
+
+  try {
+    const res = await fetch('/payroll/bulk_save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows: rowsToSave })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const result = await res.json();
+
+    isBulkEditing = false;
+    editingRows = {};
+    updateEditToolbarState();
+
+    const st = els.dataTable.parentElement.scrollTop;
+    await loadData();
+    els.dataTable.parentElement.scrollTop = st;
+
+    els.dataStatus.style.color = 'var(--success)';
+    els.dataStatus.textContent = `Saved and recalculated ${result.updated_count || rowsToSave.length} records successfully \u2713`;
+    setTimeout(() => {
+      els.dataStatus.textContent = '';
+      els.dataStatus.style.color = '';
+    }, 4000);
+  } catch (err) {
+    console.error("Bulk save error:", err);
+    els.dataStatus.style.color = 'var(--danger)';
+    els.dataStatus.textContent = 'Bulk save failed: ' + err.message;
+  } finally {
+    hideLoader();
+  }
+}
+
 function startEdit(rowKey) {
   const tr = els.dataTable.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
   if (!tr) return;
 
-  const actionTd = tr.querySelector('td:first-child');
-  actionTd.innerHTML =
-    `<button class="btn-icon save" title="Save" onclick="saveRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>` +
-    `<button class="btn-icon cancel" title="Cancel" onclick="cancelEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>`;
+  const actionTd = tr.querySelector('.cell-actions') || tr.querySelector('td.actions-col');
+  if (actionTd) {
+    actionTd.innerHTML =
+      `<button class="btn-icon save" title="Save this row" onclick="saveRow('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg></button>` +
+      `<button class="btn-icon cancel" title="Cancel this row" onclick="cancelEdit('${escapeAttr(rowKey)}')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg></button>`;
+  }
   
   editingRows[rowKey] = {};
   const tds = tr.querySelectorAll('td[data-col]');
   tds.forEach(td => {
     const col = td.getAttribute('data-col');
     if (!NON_EDITABLE_COLUMNS.has(col) && col !== 'emp_id' && col !== 'Employee Name') {
-      const val = td.textContent;
+      const val = td.textContent.trim();
       editingRows[rowKey][col] = val;
       td.innerHTML = `<input type="text" class="cell-input" data-col="${escapeAttr(col)}" value="${escapeHtml(val)}" />`;
     }
@@ -1065,6 +1239,10 @@ function startEdit(rowKey) {
 
 function cancelEdit(rowKey) {
   delete editingRows[rowKey];
+  if (Object.keys(editingRows).length === 0) {
+    isBulkEditing = false;
+    updateEditToolbarState();
+  }
   renderDataTable(currentColumns, currentData);
 }
 
@@ -1089,19 +1267,18 @@ async function saveRow(rowKey) {
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
 
-    // hide calculation log to improve UI performance
-    // if (data.calc_log && data.calc_log.length) {
-    //   console.log("Calculation log:", data.calc_log);
-    // }
-
     delete editingRows[rowKey];
-    // update cells by reloading data to preserve all action buttons properly
+    if (Object.keys(editingRows).length === 0) {
+      isBulkEditing = false;
+      updateEditToolbarState();
+    }
     const st = els.dataTable.parentElement.scrollTop;
-    await loadData(); hideLoader();
+    await loadData();
+    hideLoader();
     els.dataTable.parentElement.scrollTop = st;
     els.dataStatus.textContent = 'Saved \u2713';
     setTimeout(() => { els.dataStatus.textContent = ''; }, 2000);
-  hideLoader(); hideLoader(); hideLoader(); hideLoader(); } catch (err) {
+  } catch (err) {
     els.dataStatus.textContent = 'Save failed: ' + err.message;
   }
 }
@@ -1110,6 +1287,16 @@ async function downloadPayslip(id) {
   showLoader('Downloading Payslip...');
   window.open(`/payroll/${id}/download_payslip`, '_blank');
   setTimeout(hideLoader, 2000);
+}
+
+if (document.getElementById('btnEditAll')) {
+  document.getElementById('btnEditAll').addEventListener('click', startBulkEdit);
+}
+if (document.getElementById('btnSaveAll')) {
+  document.getElementById('btnSaveAll').addEventListener('click', saveBulkEdit);
+}
+if (document.getElementById('btnCancelAll')) {
+  document.getElementById('btnCancelAll').addEventListener('click', cancelBulkEdit);
 }
 
 if (document.getElementById('btnGenerateAll')) document.getElementById('btnGenerateAll').addEventListener('click', async () => {

@@ -41,6 +41,8 @@ def guess_warehouse(sheet_name, warehouse_list):
         "BAJAJ": "Bajaj",
         "BOSCH": "Bosch",
         "HAIER": "Haier",
+        "VSA": "VSA",
+        "KSH": "KSH",
     }
     for alias_key, target_wh in aliases.items():
         if alias_key in norm_sheet:

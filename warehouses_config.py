@@ -11,6 +11,6 @@ LOCATIONS = {
     "Bangalore": [
         "APL", "Havells", "Sony", "Sony-FG", "Sony-spares", "sony-tpt", "fly", "schneider", "unicharm bellary",
         "Unicharm", "Bajaj", "abb(nelamangla)", "abb(HANCHIPURA)",
-        "Bosch", "LG", "TPT", "Shaw Floor", "Haier",
+        "Bosch", "LG", "TPT", "Shaw Floor", "Haier", "VSA", "KSH",
     ],
 }

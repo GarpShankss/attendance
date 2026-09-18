@@ -770,8 +770,11 @@ def get_filtered_data(location: str = None, warehouse: str = None,
                 "_collection": name,
                 "_id": str(d.get("_id")) if d.get("_id") else "",
                 "_row_id": d.get("_row_id", d.get("emp_id")),
-                "_sheet": d.get("_sheet"), "_warehouse": d.get("_warehouse"),
-                "_upload_month": d.get("_upload_month"), "_upload_year": d.get("_upload_year"),
+                "_sheet": d.get("_sheet"),
+                "_location": d.get("_location"),
+                "_warehouse": d.get("_warehouse"),
+                "_upload_month": d.get("_upload_month"),
+                "_upload_year": d.get("_upload_year"),
                 **{c: flat.get(c) for c in columns},
             })
     for r in rows:
@@ -803,10 +806,7 @@ def add_row(name: str, payload: dict = Body(...)):
     return {"ok": True, "_row_id": next_id}
 
 
-@app.put("/collections/{name}/{row_id}")
-def save_row(name: str, row_id: str, payload: dict = Body(...)):
-    """Recalculate and save. Accepts edits to Fixed and Employee Info fields,
-    rejects edits to calculated/attendance fields, runs engine, saves all."""
+def _recalculate_and_save_single(name: str, row_id: str, payload: dict, broadcast: bool = True):
     if name not in db.list_collection_names():
         raise HTTPException(404, "Unknown collection")
     import re as _re
@@ -867,16 +867,53 @@ def save_row(name: str, row_id: str, payload: dict = Body(...)):
     
     updates["_manual_overrides"] = manual_overrides
 
-    if not updates:
-        raise HTTPException(400, "No columns to update")
+    if updates:
+        db[name].update_one(_row_filter(name, row_id), {"$set": updates})
 
-    db[name].update_one(_row_filter(name, row_id), {"$set": updates})
     updated = db[name].find_one(_row_filter(name, row_id))
-    clean = _flatten_doc(updated)
+    clean = _flatten_doc(updated) if updated else {}
     clean.pop("_id", None)
-    emp_id = updated.get("emp_id") or base.get("emp_id") or str(row_id)
-    broadcaster.broadcast(emp_id)
+    emp_id = (updated.get("emp_id") if updated else None) or base.get("emp_id") or str(row_id)
+    if broadcast:
+        broadcaster.broadcast(emp_id)
     return {"ok": True, "row": clean, "calc_log": calc_log}
+
+
+@app.put("/collections/{name}/{row_id}")
+def save_row(name: str, row_id: str, payload: dict = Body(...)):
+    """Recalculate and save. Accepts edits to Fixed and Employee Info fields,
+    rejects edits to calculated/attendance fields, runs engine, saves all."""
+    return _recalculate_and_save_single(name, row_id, payload, broadcast=True)
+
+
+@app.post("/payroll/bulk_save")
+def bulk_save_payroll(payload: dict = Body(...)):
+    """Bulk save edits across multiple payroll rows at once."""
+    rows = payload.get("rows", [])
+    if not rows:
+        return {"ok": True, "updated_count": 0, "errors": []}
+
+    saved_count = 0
+    errors = []
+    for item in rows:
+        col_name = item.get("collection") or "payroll_records"
+        row_id = str(item.get("row_id", ""))
+        data = item.get("payload", {})
+        if not row_id or not data:
+            continue
+        try:
+            _recalculate_and_save_single(col_name, row_id, data, broadcast=False)
+            saved_count += 1
+        except Exception as e:
+            errors.append({"row_id": row_id, "error": str(e)})
+
+    broadcaster.broadcast("reload")
+    return {"ok": True, "updated_count": saved_count, "errors": errors}
+
+
+@app.post("/collections/{name}/bulk_save")
+def bulk_save_collection(name: str, payload: dict = Body(...)):
+    return bulk_save_payroll(payload)
 
 
 @app.post("/collections/{name}/{row_id}/recalculate")
