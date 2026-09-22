@@ -27,7 +27,9 @@ DEFAULTS = {
         "HL": { "name": "Half Leave",      "present": 0.5, "paid": True,  "lop": 0.5 },
         "A":  { "name": "Absent",          "present": 0,   "paid": False, "lop": 1 },
         "WO": { "name": "Week Off",        "present": 0,   "paid": True,  "lop": 0 },
-        "CO": { "name": "Comp Off",        "present": 1,   "paid": True,  "lop": 0 }
+        "CO": { "name": "Comp Off",        "present": 1,   "paid": True,  "lop": 0 },
+        "L":  { "name": "Leave",           "present": 1,   "paid": True,  "lop": 0 },
+        "LE": { "name": "Left",            "present": 0,   "paid": False, "lop": 0 }
     }
 }
 

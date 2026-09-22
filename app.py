@@ -1739,14 +1739,14 @@ def update_employee_status(location: str, warehouse: str, emp_id: str, payload: 
             }}
         )
 
-        # Update attendance in this cycle: mark dates after leaving_date as "L"
+        # Update attendance in this cycle: mark dates after leaving_date as "LE"
         period_dates = get_payroll_dates(left_m, left_y)
         att_updates = {}
         for d_str in period_dates:
             try:
                 dt = datetime.strptime(d_str, "%Y-%m-%d").date()
                 if dt > leaving_dt:
-                    att_updates[f"days.{d_str}"] = "L"
+                    att_updates[f"days.{d_str}"] = "LE"
             except ValueError:
                 pass
 
@@ -2032,9 +2032,9 @@ def download_attendance(month: int, year: int, location: str, warehouse: str):
             if doj_date and d < doj_date:
                 val = ""
             elif leaving_date and d > leaving_date:
-                val = "L"
-            elif val == "L":
-                val = "L"
+                val = "LE"
+            elif val == "LE":
+                val = "LE"
             elif not val:
                 if d.weekday() == 6:
                     val = "WO"

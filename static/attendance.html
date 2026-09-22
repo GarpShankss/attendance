@@ -78,7 +78,9 @@
   .legend-hl { background: var(--warning); }
   .legend-sl { background: #eab308; }
   .legend-pl { background: #9333ea; }
-  .legend-a { background: var(--danger); }
+  .legend-l  { background: #0d9488; }
+  .legend-le { background: #64748b; }
+  .legend-a  { background: var(--danger); }
   
   /* Enterprise Table */
   .att-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); max-height: 65vh; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -116,7 +118,8 @@
   table.att input.day-inp.status-pl { background: #9333ea; color: white; border-color: transparent; }
   table.att input.day-inp.status-cl { background: #9333ea; color: white; border-color: transparent; }
   table.att input.day-inp.status-a  { background: var(--danger); color: white; border-color: transparent; }
-  table.att input.day-inp.status-l  { background: #64748b; color: white; border-color: transparent; }
+  table.att input.day-inp.status-l  { background: #0d9488; color: white; border-color: transparent; }
+  table.att input.day-inp.status-le { background: #64748b; color: white; border-color: transparent; }
   
   table.att td.summary { background: #f9fafb; font-weight: 600; }
   
@@ -185,8 +188,9 @@
   <div class="legend-item"><div class="legend-color legend-hl"></div> Half Leave (HL)</div>
   <div class="legend-item"><div class="legend-color legend-sl"></div> Sick Leave (SL)</div>
   <div class="legend-item"><div class="legend-color legend-pl"></div> Privilege Leave (PL)</div>
+  <div class="legend-item"><div class="legend-color legend-l" style="background:#0d9488;"></div> Leave (L)</div>
   <div class="legend-item"><div class="legend-color legend-a"></div> Absent (A)</div>
-  <div class="legend-item"><div class="legend-color" style="background:#64748b;"></div> Discontinued / Left (L)</div>
+  <div class="legend-item"><div class="legend-color legend-le" style="background:#64748b;"></div> Discontinued / Left (LE)</div>
 </div>
 
 <div class="loader-overlay" id="globalLoader">
@@ -463,8 +467,8 @@ function renderTable(employees) {
          val = '';
       } else if (leavingDate && date > leavingDate) {
          disabledAttr = ' disabled style="background:#e2e8f0; color:#475569; cursor:not-allowed;" title="Discontinued / Left"';
-         val = 'L';
-      } else if (val === 'L') {
+         val = 'LE';
+      } else if (val === 'LE') {
          disabledAttr = ' disabled style="background:#e2e8f0; color:#475569; cursor:not-allowed;" title="Discontinued / Left"';
       }
       
@@ -487,7 +491,7 @@ function renderTable(employees) {
       const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
 
       const valid = Object.keys(currentPolicy);
-      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : (val === 'L' ? 'status-l' : 'status-blank');
+      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : (val === 'LE' ? 'status-le' : 'status-blank');
       dayCells += `<td${classAttr}><input class="day-inp ${cls}" type="text" maxlength="2"`
             + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)" onkeydown="onDayKeyDown(event, this)"${disabledAttr}></td>`;
     }
@@ -524,7 +528,7 @@ function onDayInput(inp) {
   }
 
   const valid = Object.keys(currentPolicy);
-  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : (uiVal === 'L' ? 'status-l' : 'status-blank');
+  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : (uiVal === 'LE' ? 'status-le' : 'status-blank');
   inp.className = 'day-inp ' + cls;
 
   // live summary
@@ -549,7 +553,7 @@ function onDayInput(inp) {
        if (dt.getDay() === 0) v = 'WO';
        else v = 'P';
     }
-    if (v === 'L') {
+    if (v === 'LE') {
       unemployedDays += 1;
       return;
     }
@@ -968,7 +972,7 @@ setupAttendanceRealtime();
     <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:20px;">
       <label style="font-size:13px; font-weight:500; color:var(--text);">Date of Leaving (DOL) *</label>
       <input type="date" id="leftModalDate" style="padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; width:100%;">
-      <small style="color:var(--text-muted); font-size:11px; margin-top:4px;">Days after this date in current cycle will be marked 'L' (Left). The employee will not appear in attendance or salary sheets for subsequent months.</small>
+      <small style="color:var(--text-muted); font-size:11px; margin-top:4px;">Days after this date in current cycle will be marked 'LE' (Left). The employee will not appear in attendance or salary sheets for subsequent months.</small>
     </div>
     <div style="display:flex; gap:8px; justify-content:flex-end;">
       <button type="button" class="btn-outline" onclick="closeLeftModal()">Cancel</button>

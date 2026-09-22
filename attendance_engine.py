@@ -72,7 +72,7 @@ def _calc_attendance(emp_id: str, location: str, warehouse: str, month: int, yea
             continue
                 
         val = str(full_days.get(d_str) or "").strip().upper()
-        if val == "L":
+        if val == "LE":
             unemployed_days += 1
             continue
 
