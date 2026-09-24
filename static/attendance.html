@@ -150,6 +150,12 @@
   .toast.error { border-left-color: var(--danger); }
   .toast.warning { border-left-color: var(--warning); }
   @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* Context Menu */
+  #cellContextMenu { display: none; position: fixed; z-index: 4000; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.12); font-size: 13px; min-width: 230px; overflow: hidden; animation: slideIn 0.15s ease; }
+  .ctx-header { padding: 8px 14px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; background: var(--bg-color); }
+  .ctx-btn { width: 100%; text-align: left; padding: 9px 14px; background: none; border: none; border-radius: 0; cursor: pointer; font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 8px; box-shadow: none; }
+  .ctx-btn:hover { background: var(--primary-light); color: var(--primary); transform: none; box-shadow: none; }
   
   /* Loader Overlay */
   .loader-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); z-index: 2000; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--text); font-weight: 600; }
@@ -466,10 +472,7 @@ function renderTable(employees) {
          disabledAttr = ' disabled style="background:rgba(255,255,255,0.05); color:transparent; cursor:not-allowed;" title="Before Date of Joining"';
          val = '';
       } else if (leavingDate && date > leavingDate) {
-         disabledAttr = ' disabled style="background:#e2e8f0; color:#475569; cursor:not-allowed;" title="Discontinued / Left"';
-         val = 'LE';
-      } else if (val === 'LE') {
-         disabledAttr = ' disabled style="background:#e2e8f0; color:#475569; cursor:not-allowed;" title="Discontinued / Left"';
+         if (!val) val = 'LE';
       }
       
       // Defaulting to Present ("P") and Sunday ("WO") for active employment days
@@ -491,9 +494,9 @@ function renderTable(employees) {
       const classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
 
       const valid = Object.keys(currentPolicy);
-      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : (val === 'LE' ? 'status-le' : 'status-blank');
+      const cls = valid.includes(val) ? 'status-' + val.toLowerCase() : (val === 'LE' ? 'status-le' : (val === 'L' ? 'status-l' : 'status-blank'));
       dayCells += `<td${classAttr}><input class="day-inp ${cls}" type="text" maxlength="2"`
-            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)" onkeydown="onDayKeyDown(event, this)"${disabledAttr}></td>`;
+            + ` data-day="${key}" value="${esc(val)}" oninput="onDayInput(this)" onkeydown="onDayKeyDown(event, this)" onfocus="this.select()" onclick="this.select()" oncontextmenu="showCellContextMenu(event, this)"${disabledAttr}></td>`;
     }
     
     body += dayCells;
@@ -528,7 +531,7 @@ function onDayInput(inp) {
   }
 
   const valid = Object.keys(currentPolicy);
-  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : (uiVal === 'LE' ? 'status-le' : 'status-blank');
+  const cls = valid.includes(uiVal) ? 'status-' + uiVal.toLowerCase() : (uiVal === 'LE' ? 'status-le' : (uiVal === 'L' ? 'status-l' : 'status-blank'));
   inp.className = 'day-inp ' + cls;
 
   // live summary
@@ -590,14 +593,26 @@ function onDayInput(inp) {
   
   // Auto-advance logic
   if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
-  if (uiVal.length > 0 && valid.includes(uiVal)) {
-      const isPrefix = valid.some(v => v !== uiVal && v.startsWith(uiVal));
-      if (isPrefix) {
-          window.autoAdvanceTimer = setTimeout(() => {
+  if (uiVal.length > 0) {
+      if (uiVal.length === 2) {
+          // Complete 2-letter status code (LE, WO, CL, SL, PL, HL, HP, CO, etc.)
+          if (valid.includes(uiVal) || uiVal === 'LE') {
               moveToNextCell(inp, 'right');
-          }, 350);
-      } else {
-          moveToNextCell(inp, 'right');
+          }
+      } else if (uiVal.length === 1) {
+          // Check if this single letter could be the beginning of a 2-letter code
+          // e.g., 'L' (could be 'LE'), 'P' (could be 'PL'), 'H' (could be 'HL')
+          const isPrefix = valid.some(v => v !== uiVal && v.startsWith(uiVal)) || (uiVal === 'L');
+          if (isPrefix) {
+              // Give user 900ms to type second letter without prematurely jumping away!
+              // They can also press Enter, Tab, or ArrowRight to advance immediately.
+              window.autoAdvanceTimer = setTimeout(() => {
+                  moveToNextCell(inp, 'right');
+              }, 900);
+          } else if (valid.includes(uiVal)) {
+              // 1-letter status code that is NOT a prefix (e.g. 'A' for Absent)
+              moveToNextCell(inp, 'right');
+          }
       }
   }
 }
@@ -617,8 +632,21 @@ function moveToNextCell(inp, direction) {
     }
 }
 
+function moveToVerticalCell(inp, direction) {
+    const tr = inp.closest('tr');
+    const day = inp.dataset.day;
+    const targetTr = direction === 'up' ? tr.previousElementSibling : tr.nextElementSibling;
+    if (targetTr) {
+        const targetInp = targetTr.querySelector(`input.day-inp[data-day="${day}"]:not([disabled])`);
+        if (targetInp) {
+            targetInp.focus();
+            targetInp.select();
+        }
+    }
+}
+
 function onDayKeyDown(e, inp) {
-    if (e.key === 'ArrowRight') {
+    if (e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault();
         if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
         moveToNextCell(inp, 'right');
@@ -636,6 +664,8 @@ function onDayKeyDown(e, inp) {
         }
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
+        if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
+        moveToVerticalCell(inp, e.key === 'ArrowUp' ? 'up' : 'down');
     } else if (e.key === 'Backspace' || e.key === 'Delete') {
         if (window.autoAdvanceTimer) clearTimeout(window.autoAdvanceTimer);
     }
@@ -963,7 +993,91 @@ function setupAttendanceRealtime() {
 }
 
 setupAttendanceRealtime();
+
+// ── Day Cell Right-Click Context Menu ───────────────────────────────────────
+let currentContextMenuInp = null;
+
+function showCellContextMenu(e, inp) {
+  e.preventDefault();
+  if (inp.disabled) return;
+  currentContextMenuInp = inp;
+  const menu = document.getElementById('cellContextMenu');
+  if (!menu) return;
+
+  const currentVal = inp.value.trim().toUpperCase() || 'P';
+  const labelEl = document.getElementById('ctxFillCodeLabel');
+  if (labelEl) labelEl.textContent = currentVal;
+
+  menu.style.display = 'block';
+  // Position menu intelligently within viewport
+  const menuWidth = 240, menuHeight = 160;
+  let posX = e.clientX;
+  let posY = e.clientY;
+  if (posX + menuWidth > window.innerWidth) posX = window.innerWidth - menuWidth - 10;
+  if (posY + menuHeight > window.innerHeight) posY = window.innerHeight - menuHeight - 10;
+  menu.style.left = `${posX}px`;
+  menu.style.top = `${posY}px`;
+}
+
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('cellContextMenu');
+  if (menu && !menu.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+function fillCellAction(action) {
+  const menu = document.getElementById('cellContextMenu');
+  if (menu) menu.style.display = 'none';
+  if (!currentContextMenuInp) return;
+
+  const tr = currentContextMenuInp.closest('tr');
+  const allInputs = Array.from(tr.querySelectorAll('input.day-inp:not([disabled])'));
+  const startIndex = allInputs.indexOf(currentContextMenuInp);
+  if (startIndex === -1) return;
+
+  let fillCode = '';
+  if (action === 'fill-remaining') {
+    fillCode = currentContextMenuInp.value.trim().toUpperCase() || 'P';
+  } else if (action === 'mark-le-remaining') {
+    fillCode = 'LE';
+  } else if (action === 'reset-p-remaining') {
+    fillCode = 'P';
+  }
+
+  const valid = Object.keys(currentPolicy);
+  for (let idx = startIndex; idx < allInputs.length; idx++) {
+    const inp = allInputs[idx];
+    const dt = new Date(inp.dataset.day);
+    let codeToSet = fillCode;
+    if (action === 'reset-p-remaining' && dt.getDay() === 0) {
+      codeToSet = 'WO';
+    }
+    inp.value = codeToSet;
+    const cls = valid.includes(codeToSet) ? 'status-' + codeToSet.toLowerCase() : (codeToSet === 'LE' ? 'status-le' : (codeToSet === 'L' ? 'status-l' : 'status-blank'));
+    inp.className = 'day-inp ' + cls;
+  }
+
+  onDayInput(currentContextMenuInp);
+  showToast(`Updated days from this date to ${fillCode} ✓`, 'success');
+}
 </script>
+
+<div id="cellContextMenu">
+  <div class="ctx-header">Quick Attendance Actions</div>
+  <button type="button" class="ctx-btn" onclick="fillCellAction('mark-le-remaining')" style="color:#475569; font-weight:600;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="18" y1="8" x2="23" y2="13"></line><line x1="23" y1="8" x2="18" y2="13"></line></svg>
+    Mark Left (LE) from here to month-end
+  </button>
+  <button type="button" class="ctx-btn" onclick="fillCellAction('fill-remaining')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+    Fill current (<span id="ctxFillCodeLabel">P</span>) to month-end
+  </button>
+  <button type="button" class="ctx-btn" onclick="fillCellAction('reset-p-remaining')" style="color:var(--success);">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><polyline points="21 3 21 8 16 8"></polyline><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><polyline points="8 16 3 16 3 21"></polyline></svg>
+    Reset to Present (P) to month-end
+  </button>
+</div>
 
 <div id="leftModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:3000; align-items:center; justify-content:center;">
   <div style="background:#fff; border-radius:8px; padding:24px; max-width:420px; width:90%; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
